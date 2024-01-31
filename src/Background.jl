@@ -104,8 +104,8 @@ function FLRW(h::Real, Ω_χ0::Real, Ω_b0::Real, Ω_k0::Real=0; T0_CMB_K::Real 
         z_eq_mr = EdS ? NaN : exp(Roots.find_zero( y -> Ω_r(exp(y), Ω_m0, Ω_r0, Ω_Λ0, Ω_k0) - Ω_m(exp(y), Ω_m0, Ω_r0, Ω_Λ0, Ω_k0), (-10, 10), Roots.Bisection())) 
         z_eq_Λm = exp(Roots.find_zero( y -> Ω_Λ(exp(y), Ω_m0, Ω_r0, Ω_Λ0, Ω_k0) - Ω_m(exp(y), Ω_m0, Ω_r0, Ω_Λ0, Ω_k0), (-10, 10), Roots.Bisection())) 
     catch e
-        println("Impossible to definez z_eq_mr and/or z_eq_Λm for this cosmology")
-        println("Error: ", e)
+        Throw(e("Impossible to definez z_eq_mr and/or z_eq_Λm for this cosmology"))
+
     end
 
     k_eq_mr =  EdS ? NaN : Ω_r0 / Ω_m0 * (100. * h * sqrt(Ω_m0 * (1+z_eq_mr)^3 + Ω_r0 * (1+z_eq_mr)^4 + Ω_Λ0 + Ω_k0 * (1+z_eq_mr)^2) * KM_TO_MPC / C_LIGHT) 

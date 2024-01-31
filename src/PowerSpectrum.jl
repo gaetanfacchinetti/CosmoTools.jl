@@ -1,6 +1,3 @@
-
-include("TransferFunction.jl")
-
 export Cosmology, planck18, curvature_power_spectrum, matter_power_spectrum, power_spectrum_ΛCDM
 export window_function, Window, TopHatWindow, SharpKWindow, GaussianWindow, radius_from_mass, mass_from_radius, dradius_dmass
 export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_M, dσ_mps_dM

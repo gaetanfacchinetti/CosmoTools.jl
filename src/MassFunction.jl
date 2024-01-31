@@ -1,6 +1,4 @@
 
-include("PowerSpectrum.jl")
-
 export dn_dM, MassFunctionType, PressSchechter, SethTormen
 
 
