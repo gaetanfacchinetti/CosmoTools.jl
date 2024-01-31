@@ -15,6 +15,7 @@ abstract type SethTormen <: MassFunctionType end
 f_mass_function(ν::Real, ::Type{PressSchechter}) = sqrt(2.0 / π) * exp(-ν^2 / 2.0)
 
 function f_mass_function(ν::Real, ::Type{SethTormen}) 
+
     _a = 0.707;
     _νp = sqrt(_a) * ν;
     _q = 0.3;

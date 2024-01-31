@@ -8,7 +8,7 @@
 #
 ########################################################
 
-include("BackgroundCosmo.jl")
+include("Background.jl")
 
 export transfer_function, TrivialTF, EH98, TransferFunctionModel, EH98_planck18
 
@@ -36,7 +36,7 @@ end
 g_func(y::Real) = (-6.0*sqrt(1.0+y) + (2.0+3.0*y)*log((sqrt(1.0+y)+1)/(sqrt(1.0+y)-1.0))) * y
 
 
-function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_eq_mr_Mpc::Real, ::Type{T}; T0_CMB_K::Real = 2.72548) where {T<:Real}
+function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_eq_mr::Real, ::Type{T}; T0_CMB_K::Real = 2.72548) where {T<:Real}
     
     Θ27::T = T0_CMB_K / 2.7
 
@@ -48,7 +48,7 @@ function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_
     # sound horizon
     R_drag = 31.5 * Ω_b0_h2 * Θ27^(-4) * 1e+3 / z_drag
     R_eq   = 31.5 * Ω_b0_h2 * Θ27^(-4) * 1e+3 / z_eq_mr
-    sound_horizon_Mpc::T = 2. / (3. * k_eq_mr_Mpc) * sqrt(6. / R_eq) * log((sqrt(1. + R_drag) + sqrt(R_drag + R_eq))/(1+sqrt(R_eq)))
+    sound_horizon_Mpc::T = 2. / (3. * k_eq_mr) * sqrt(6. / R_eq) * log((sqrt(1. + R_drag) + sqrt(R_drag + R_eq))/(1+sqrt(R_eq)))
 
     # α_c
     a1  = (46.9 * Ω_m0_h2)^0.670 * (1.0 + (32.1 * Ω_m0_h2)^(-0.532) )
@@ -62,22 +62,23 @@ function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_
 
     # k_silk, α_b, and β_b
     k_Silk::T = 1.6 * ( Ω_b0_h2^0.52 ) * (Ω_m0_h2^0.73 ) * ( 1.0 + (10.4 * Ω_m0_h2)^(-0.95) )
-    α_b::T = 2.07 * k_eq_mr_Mpc * sound_horizon_Mpc * (1.0 + R_drag)^(-3.0/4.0) * g_func( (1.0 + z_eq_mr) / (1.0 + z_drag) )
+    α_b::T = 2.07 * k_eq_mr * sound_horizon_Mpc * (1.0 + R_drag)^(-3.0/4.0) * g_func( (1.0 + z_eq_mr) / (1.0 + z_drag) )
     β_b::T = 0.5 + Ω_b0_h2 / Ω_m0_h2 + (3.0 - 2.0 * Ω_b0_h2/Ω_m0_h2) * sqrt( 1.0 + (17.2 * Ω_m0_h2)^2 )
 
     EH98(convert(T, Ω_m0_h2), convert(T, Ω_b0_h2), convert(T, Ω_χ0_h2), convert(T, Θ27), z_drag, sound_horizon_Mpc, α_c, α_b, β_c, β_b, k_Silk)
 end
 
-function EH98(cosmo::BkgCosmology{<:Real}, ::Type{T} = Float64) where {T<:Real}
 
-    Ω_m0_h2::T = cosmo.Ω_m0 * cosmo.h^2
-    Ω_b0_h2::T = cosmo.Ω_b0 * cosmo.h^2
-    Ω_χ0_h2::T = cosmo.Ω_χ0 * cosmo.h^2
+function EH98(bkg_cosmo::FLRW{<:Real}, ::Type{T} = Float64) where {T<:Real}
 
-    z_eq = z_eq_mr(cosmo)
-    k_eq_Mpc = k_eq_mr_Mpc(cosmo)
+    Ω_m0_h2::T = bkg_cosmo.Ω_m0 * bkg_cosmo.h^2
+    Ω_b0_h2::T = bkg_cosmo.Ω_b0 * bkg_cosmo.h^2
+    Ω_χ0_h2::T = bkg_cosmo.Ω_χ0 * bkg_cosmo.h^2
 
-    return EH98(Ω_m0_h2, Ω_b0_h2, Ω_χ0_h2, z_eq, k_eq_Mpc, T, T0_CMB_K = cosmo.T0_CMB_K)
+    z_eq = z_eq_mr(bkg_cosmo)
+    k_eq_Mpc = k_eq_mr(bkg_cosmo)
+
+    return EH98(Ω_m0_h2, Ω_b0_h2, Ω_χ0_h2, z_eq, k_eq_Mpc, T, T0_CMB_K = bkg_cosmo.T0_CMB_K)
 end
 
 const EH98_planck18 = EH98(planck18_bkg)
@@ -110,16 +111,18 @@ end
 
 
 
+@doc raw"""
+    transfer_function(k, [bkg_cosmo::BkgCosmology], with_baryons = true)
+
+If bkg_cosmo is given computes the transfer function for
+
 """
-    transfer_function
-"""
-function transfer_function(k::Real, cosmo::BkgCosmology{<:Real}; with_baryons::Bool = true)
-    p = EH98(cosmo)
+function transfer_function(k::Real, bkg_cosmo::FLRW{<:Real}; with_baryons::Bool = true)
+    p = EH98(bkg_cosmo)
     tc = transfer_cdm(k, p)
     tb = transfer_baryons(k, p)
     return with_baryons ? p.Ω_b0_h2 / p.Ω_m0_h2 * tb + p.Ω_χ0_h2/p.Ω_m0_h2 * tc : p.Ω_χ0_h2 / p.Ω_m0_h2 * tc
 end
-
 
 function transfer_function(k::Real, p::EH98 = EH98_planck18; with_baryons::Bool = true)
     tc = transfer_cdm(k, p)
@@ -129,8 +132,8 @@ end
 
 ## Define here the trivial transfer function
 struct TrivialTF <: TransferFunctionModel end
-TrivialTF(cosmo::BkgCosmology{<:Real}) = TrivialTF()
-transfer_function(k::Real, p::TrivialTF; with_baryons::Bool = true) = 1.0
+TrivialTF(bkg_cosmo::BkgCosmology) = TrivialTF()
+transfer_function(k::Real, p::TrivialTF; with_baryons::Bool = true) = 1
 
 ## Other transfer functions can be implemented down here
 

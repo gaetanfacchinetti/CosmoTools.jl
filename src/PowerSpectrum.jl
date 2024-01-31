@@ -9,14 +9,21 @@ export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_
 # COSMOLOGY STRUCTURE
 #####################
 
+
+@doc raw"""
+   Cosmology
+
+Defines a generic cosmology
+"""
 struct Cosmology
     name::String
-    bkg::BkgCosmology{<:Real}
+    bkg::BkgCosmology
     power_spectrum::Function
     transfer_function_model::TransferFunctionModel
 end
 
-function Cosmology(name::String, bkg::BkgCosmology{<:Real}, power_spectrum::Function, ::Type{T} = EH98) where {T<:TransferFunctionModel}
+
+function Cosmology(name::String, bkg::BkgCosmology, power_spectrum::Function, ::Type{T} = EH98) where {T<:TransferFunctionModel}
     return Cosmology(name, bkg, power_spectrum, T(bkg))
 end
 
@@ -47,7 +54,7 @@ function matter_power_spectrum(
     dimensionless = false,
     with_baryons::Bool = true)
 
-    _c_over_H0_Mpc = C_LIGHT / (hubble_H0(cosmology.bkg) * Unitful.km / Unitful.s / UnitfulAstro.Mpc) / UnitfulAstro.Mpc |> Unitful.NoUnits 
+    _c_over_H0_Mpc = C_LIGHT / hubble_H0_s(cosmology.bkg)
     _D1_z = growth_function(z, cosmology.bkg)
     _tf = transfer_function(k, cosmology.transfer_function_model, with_baryons = with_baryons)
     _prefactor = !dimensionless ? 1 : k^3/(2*π^2)
@@ -56,9 +63,9 @@ function matter_power_spectrum(
 end
 
 
-###############################################
-# QUANTITIES THAT DEPEND ON THE WINDOW FUNCTION
-###############################################
+###################################################
+# QUANTITIES DERIVED FROM THE MATTER POWER SPECTRUM
+###################################################
 
 abstract type Window end
 abstract type TopHatWindow <: Window end
