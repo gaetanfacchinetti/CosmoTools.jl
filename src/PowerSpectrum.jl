@@ -1,3 +1,22 @@
+##################################################################################
+# This file is part of CosmoTools.jl
+#
+# Copyright (c) 2024, Gaétan Facchinetti
+#
+# CosmoTools.jl is free software: you can redistribute it and/or modify it 
+# under the terms of the GNU General Public License as published by 
+# the Free Software Foundation, either version 3 of the License, or any 
+# later version. CosmoTools.jl is distributed in the hope that it will be useful, 
+# but WITHOUT ANY WARRANTY; without even the implied warranty of 
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU 
+# General Public License along with 21cmCAST. 
+# If not, see <https://www.gnu.org/licenses/>.
+##################################################################################
+
+
 export Cosmology, planck18, curvature_power_spectrum, matter_power_spectrum, power_spectrum_ΛCDM
 export window_function, Window, TopHatWindow, SharpKWindow, GaussianWindow, radius_from_mass, mass_from_radius, dradius_dmass
 export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_M, dσ_mps_dM
