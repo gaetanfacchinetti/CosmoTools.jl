@@ -24,11 +24,6 @@
 ##################################################################################
 
 
-# First define some basic constants (the only one we will need)
-const G_NEWTON::Float64 = 4.517103049894965e-48 # in Mpc^3 / Msun / s^(2)
-const C_LIGHT::Float64 = 9.715611890180198e-15 # Mpc / s 
-const MPC_TO_KM::Float64 = 3.085677581491367e19
-const KM_TO_MPC::Float64 = 1.0/MPC_TO_KM
 
 export BkgCosmology, FLRW, FlatFLRW, planck18_bkg, edsPlanck18_bkg, convert_cosmo
 export hubble_H0, hubble_E, hubble_E2
@@ -248,7 +243,7 @@ z_eq_Λm(bkg_cosmo::BkgCosmology = planck18_bkg) = bkg_cosmo.z_eq_Λm
 a_eq_mr(bkg_cosmo::BkgCosmology = planck18_bkg) = z_to_a(bkg_cosmo.z_eq_mr)
 a_eq_Λm(bkg_cosmo::BkgCosmology = planck18_bkg) = z_to_a(bkg_cosmo.z_eq_Λm)
 
-δt_s(a0::Real, a1::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = QuadGK.quadgk(a -> 1 / hubble_E(a_to_z(a), bkg_cosmo) / a, a0, a1, rtol=1e-3; kws...)[1] / (hubble_H0(bkg_cosmo) * km_to_Mpc)
+δt_s(a0::Real, a1::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = QuadGK.quadgk(a -> 1 / hubble_E(a_to_z(a), bkg_cosmo) / a, a0, a1, rtol=1e-3; kws...)[1] / (hubble_H0(bkg_cosmo) * KM_TO_MPC)
 
 """ age of the universe (s)"""
 universe_age(z::Float64 = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = δt_s(0, z_to_a(z), bkg_cosmo; kws...)

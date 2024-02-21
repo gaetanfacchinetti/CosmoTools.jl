@@ -18,9 +18,9 @@
 
 
 export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
-export halo_from_ρs_and_rs, halo_from_mΔ_and_cΔ
+export halo_from_mΔ_and_cΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, ρ_halo, μ_halo, m_halo
-export velocity_dispersion, gravitational_potential, escape_velocity
+export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency
 
 abstract type HaloProfile{T<:Real} end
 
@@ -69,8 +69,8 @@ end
 
 ## Definition of relationships between concentration, mass, scale density and scale radius
 function cΔ_from_ρs(ρs::Real, hp::HaloProfile = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0)
-    g(c::Real) = c^3 / μ(c, hp) - 3 * ρs / Δ / ρ_ref
-    Roots.find_zero(g, (1e-10, 1e+10), Bisection()) 
+    g(c::Real) = c^3 / μ_halo(c, hp) - 3 * ρs / Δ / ρ_ref
+    Roots.find_zero(g, (1e-10, 1e+10), Roots.Bisection()) 
 end
 
 mΔ_from_ρs_and_rs(ρs::Real, rs::Real, hp::HaloProfile = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = 4 * pi * ρs * rs^3 * μ_halo(cΔ_from_ρs(ρs, hp, Δ, ρ_ref), hp)
@@ -89,7 +89,7 @@ Base.iterate(iter::Halo) = (iter, nothing)
 Base.iterate(::Halo, state::Nothing) = nothing
 
 
-halo_from_ρs_and_rs(hp::HaloProfile, ρs::Real, rs::Real) = Halo(hp, promote(ρs, rs)...)
+Halo(hp::HaloProfile, ρs::Real, rs::Real) = Halo(hp, promote(ρs, rs)...)
 
 function halo_from_mΔ_and_cΔ(hp::HaloProfile, mΔ::Real, cΔ::Real;  Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0)
     ρs = ρs_from_cΔ(cΔ, hp, Δ, ρ_ref)
@@ -132,6 +132,8 @@ circular_velocity(r::Real, h::Halo) = sqrt(G_NEWTON * m(r, h) / r)
 """ circular velocity in (km / s)"""
 circular_velocity_kms(r::Real, h::Halo) = sqrt(G_NEWTON * m(r, h) / r) * MPC_TO_KM
 
+""" orbital frequency in (1 / s) """
+orbital_frequency(r::Real, h::Halo) = circular_velocity(r, h) / (2*π*r)
 
 
 
