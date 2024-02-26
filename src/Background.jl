@@ -37,14 +37,14 @@ export lookback_time, lookback_redshift, universe_age
 
 Abstract type: generic background cosmology 
 """
-abstract type BkgCosmology end
+abstract type BkgCosmology{T<:Real} end
 
 @doc raw"""
     FLRW{T<:Real} <: BkgCosmology
 
 Defines a flat FLRW background cosmology
 """
-struct FLRW{T<:Real} <: BkgCosmology
+struct FLRW{T<:Real} <: BkgCosmology{T}
     
     # Hubble parameter
     h::T 

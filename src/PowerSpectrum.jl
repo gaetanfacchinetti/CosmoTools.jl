@@ -31,9 +31,9 @@ export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_
 
 Defines a generic cosmology
 """
-struct Cosmology
+struct Cosmology{T<:Real}
     name::String
-    bkg::BkgCosmology
+    bkg::BkgCosmology{T}
     power_spectrum::Function
     transfer_function_model::TransferFunctionModel
 end
