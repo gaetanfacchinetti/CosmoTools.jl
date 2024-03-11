@@ -29,6 +29,7 @@ abstract type HaloProfile{T<:Real} end
 # Dimensionless Halo
 
 struct αβγProfile{T<:Real} <: HaloProfile{T}
+    name::String
     α::T
     β::T
     γ::T
@@ -45,12 +46,12 @@ Base.show(io::IO, hp::αβγProfile{<:Real}) = print(io, "αβγProfile: α = " 
 
 
 # constructor method of αβγProfile
-αβγProfile(α::Real, β::Real, γ::Real) = αβγProfile(promote(α, β, γ)...)
+αβγProfile(name::String, α::Real, β::Real, γ::Real) = αβγProfile(name, promote(α, β, γ)...)
 
 ## definition of densities and mass profiles
-const nfwProfile::αβγProfile = αβγProfile(1, 3, 1)
-const coreProfile::αβγProfile = αβγProfile(1, 3, 0)
-const plummerProfile::αβγProfile = αβγProfile(2, 5, 0)
+const nfwProfile::αβγProfile = αβγProfile("NFW_Profile", 1, 3, 1)
+const coreProfile::αβγProfile = αβγProfile("Core_Profile", 1, 3, 0)
+const plummerProfile::αβγProfile = αβγProfile("Plummer_Profile", 2, 5, 0)
 
 # Density profile and mass
 ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-p.γ) * (1+x^p.α)^(-(p.β - p.γ)/p.α)
@@ -97,14 +98,12 @@ Base.iterate(::Halo, state::Nothing) = nothing
 
 Base.show(io::IO, h::Halo{<:Real}) = print(io, "Halo: \n  - " * string(h.hp) * "\n  - ρs = " * string(h.ρs) * " Msun/Mpc^3, rs = " * string(h.rs) * " Mpc \n  - m200 (planck18) = " * string(mΔ(h, 200, planck18)) * " Msun, c200 (planck18) = " * string(cΔ(h, 200, planck18)))
 
-
-
 Halo(hp::HaloProfile, ρs::Real, rs::Real) = Halo(hp, promote(ρs, rs)...)
 
 function halo_from_mΔ_and_cΔ(hp::HaloProfile, mΔ::Real, cΔ::Real;  Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0)
     ρs = ρs_from_cΔ(cΔ, hp, Δ, ρ_ref)
     rs = rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref)
-    return Halo(hp, promote(ρs, rs)...)
+    return Halo(hp, ρs, rs)
 end
 
 ρ_halo(r::Real, h::Halo{<:Real}) = h.ρs * ρ_halo(r/h.rs, h.hp)
