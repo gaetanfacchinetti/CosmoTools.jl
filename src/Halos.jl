@@ -20,7 +20,7 @@
 export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
 export halo_from_mΔ_and_cΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
-export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency
+export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
 
 abstract type HaloProfile{T<:Real} end
@@ -62,9 +62,20 @@ function gravitational_potential(x::Real, xt::Real, p::αβγProfile = nfwProfil
     return - quadgk(xp -> μ_halo(xp, p) / xp^2, x, xt, rtol=1e-3)[1] 
 end
 
+function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile)
+    (p == nfwProfile) && return velocity_dispersion_nfw(x, xt)
+    return sqrt(quadgk(xp -> ρ_halo(xp, p) * μ_halo(xp, p) / xp^2, x, xt, rtol=1e-5)[1]  / ρ_halo(x, p))
+end
+
+function velocity_dispersion_nfw(x::Real, xt::Real)
+    # Need to put here the analytical expression
+    return sqrt(quadgk(xp -> ρ_halo(xp, nfwProfile) * μ_halo(xp, nfwProfile) / xp^2, x, xt, rtol=1e-5)[1]  / ρ_halo(x, nfwProfile))
+end
+
+
 # s- and p-wave luminosity of the halo
 λ0_halo(x::Real, p::αβγProfile = nfwProfile) = HypergeometricFunctions._₂F₁((3 - 2*p.γ)/p.α, 2*(p.β - p.γ)/p.α, (3 + p.α - 2*p.γ)/p.α, -x^p.α) * x^(3-2*p.γ) / (3-2*p.γ)
-λ1_halo(x::Real, p::αβγProfile = nfwProfile) = 1.0 # TO DO
+λ1_halo(x::Real, p::αβγProfile = nfwProfile) = -1.0 # TO DO
 
 ################################################
 #
@@ -122,7 +133,7 @@ rs(h::Halo) = h.rs * r_0
 # Velocity of the particles inside the halo
 
 """ 1D Jeans velocity dispersion in (Mpc / s) """
-velocity_dispersion(r::Real, rt::Real, h::Halo) = sqrt(G_NEWTON / ρ_halo(r, h) *  quadgk(rp -> ρ_halo(rp, h) * m_halo(rp, h)/rp^2, r, rt, rtol=1e-5)[1])
+velocity_dispersion(r::Real, rt::Real, h::Halo) = sqrt(4 * π * h.ρs * h.rs^2 * G_NEWTON) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
 
 """ 1D Jeans velocity dispersion in (km / s) """
 velocity_dispersion_kms(r::Real, rt::Real, h::Halo) = velocity_dispersion(r, rt, h) * MPC_TO_KM
