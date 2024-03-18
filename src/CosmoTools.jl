@@ -18,7 +18,7 @@
 
 module CosmoTools
 
-import QuadGK, Roots, HypergeometricFunctions
+import QuadGK, Roots, HypergeometricFunctions, PolyLog
 
 include("Units.jl")
 include("Background.jl")

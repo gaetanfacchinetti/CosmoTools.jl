@@ -18,7 +18,7 @@
 
 
 export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
-export halo_from_mΔ_and_cΔ
+export halo_from_mΔ_and_cΔ, halo_from_mΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
 export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
@@ -44,7 +44,6 @@ Base.iterate(::HaloProfile, state::Nothing) = nothing
 # overrinding print function
 Base.show(io::IO, hp::αβγProfile{<:Real}) = print(io, "αβγProfile: α = " * string(hp.α) * ", β = " * string(hp.β) * ", γ = " * string(hp.γ))
 
-
 # constructor method of αβγProfile
 αβγProfile(name::String, α::Real, β::Real, γ::Real) = αβγProfile(name, promote(α, β, γ)...)
 
@@ -55,23 +54,44 @@ const plummerProfile::αβγProfile = αβγProfile("Plummer_Profile", 2, 5, 0)
 
 # Density profile and mass
 ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-p.γ) * (1+x^p.α)^(-(p.β - p.γ)/p.α)
-μ_halo(x::Real, p::αβγProfile = nfwProfile) = HypergeometricFunctions._₂F₁((3 - p.γ)/p.α, (p.β - p.γ)/p.α, (3 + p.α - p.γ)/p.α, -x^p.α) * x^(3-p.γ) / (3-p.γ)
 
+function μ_halo(x::Real, p::αβγProfile = nfwProfile) 
+    (p == nfwProfile) && return (x < 1e-3 ? (x^2/2 - (2 * x^3)/3 + (3 * x^4)/4 - (4 * x^5)/5) : (log(1+x) - x/(1+x)))
+    return HypergeometricFunctions._₂F₁((3 - p.γ)/p.α, (p.β - p.γ)/p.α, (3 + p.α - p.γ)/p.α, -x^p.α) * x^(3-p.γ) / (3-p.γ)
+end
+
+# dimensionless properties of the halo
+# use analytical expression when possible
 function gravitational_potential(x::Real, xt::Real, p::αβγProfile = nfwProfile) 
     (p == nfwProfile) && return (log(1+x)/x -log(1+xt)/xt)
-    return - quadgk(xp -> μ_halo(xp, p) / xp^2, x, xt, rtol=1e-3)[1] 
+    return - QuadGK.quadgk(lnxp -> μ_halo(exp(lnxp), p) / exp(lnxp), x, xt, rtol=1e-5)[1] 
 end
 
-function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile)
-    (p == nfwProfile) && return velocity_dispersion_nfw(x, xt)
-    return sqrt(quadgk(xp -> ρ_halo(xp, p) * μ_halo(xp, p) / xp^2, x, xt, rtol=1e-5)[1]  / ρ_halo(x, p))
-end
 
-function velocity_dispersion_nfw(x::Real, xt::Real)
-    # Need to put here the analytical expression
-    return sqrt(quadgk(xp -> ρ_halo(xp, nfwProfile) * μ_halo(xp, nfwProfile) / xp^2, x, xt, rtol=1e-5)[1]  / ρ_halo(x, nfwProfile))
-end
+function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile, approx::Bool = true) 
+    
+    (x >= xt) && (return 0.0)
 
+    #if (p == nfwProfile) && approx
+
+        # precision at more than 1e-8
+        #if (xt <= 1e-3)
+        #    res = _vd2_nfw(x, xt)
+        #elseif ((xt > 1e-3) && (x > 1e-2 * xt))
+        #    res = (x - xt)*((1 + xt)^2 + x*(2 + 3*xt*(4 + 3*xt)) +  x^2*(1 + xt*(9 + 7*xt))) + (1/(x*xt))*((1 + x)*(1 + xt)*(xt^2*(1 + xt - x*(3 + (3 + 5*x)*xt))*log(1 + x) + 3*x^2*(1 + x)*xt^2*(1 + xt)*log(1 + x)^2 +  x^2*(-((1 + x)*log(1 + xt)) + xt*(3*(1 + x)*log(1 + xt) + xt*(x*log((1 + 1/x)*xt) + log(xt/x) + 5*x*log(1 + xt) - 3*(1 + x)*(1 + xt)*log(1 + xt)^2 + 5*log((1 + xt)/(1 + x)) + xt*log(xt/(x + x*xt)) + x*xt*log((xt + x*xt)/(x + x*xt)))))))
+        #    res = 0.5 * res * ρ_halo(xt, p) + 3*x*(1 + x)^2*(PolyLog.reli2(-x) - PolyLog.reli2(-xt))
+        #else
+        #    res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=1e-5)[1]  / ρ_halo(x, p)
+        #end
+
+    #else
+    res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=1e-5)[1]  / ρ_halo(x, p)
+    #end
+
+    (res < 0) && throw(DomainError("The square of the velocity dispersion cannot be negative (for x = " * string(x) * ", xt = " * string(xt) * ")"))
+    
+    return sqrt(res)
+end
 
 # s- and p-wave luminosity of the halo
 λ0_halo(x::Real, p::αβγProfile = nfwProfile) = HypergeometricFunctions._₂F₁((3 - 2*p.γ)/p.α, 2*(p.β - p.γ)/p.α, (3 + p.α - 2*p.γ)/p.α, -x^p.α) * x^(3-2*p.γ) / (3-2*p.γ)
@@ -215,6 +235,70 @@ end
 
 median_concentration(m200::Real, ::Type{T} = SCP12; z::Real = 0, cosmo::Cosmology=planck18) where {T <: MassConcentrationModel} = median_concentration(m200, z, cosmo, T)
 
+halo_from_mΔ(hp::HaloProfile, mΔ::Real, ::Type{T} = SCP12;  Δ::Real = 200, cosmo::Cosmology=planck18, z=0) where {T <: MassConcentrationModel} = halo_from_mΔ_and_cΔ(hp, mΔ, median_concentration(mΔ, T, z = z, cosmo = cosmo), Δ = Δ, ρ_ref = cosmo.bkg.ρ_c0) 
+
 #######################################
 
 
+
+
+function _vd2_nfw(x::Real, xt::Real) 
+    (x >= xt) && return 0.0 
+    p =(5*x)/3 + (37*x^2)/24 + (11*x^3)/60 - (13*x^4)/240 + (37*x^5)/
+  1400 - (17*x^6)/1050 + (991*x^7)/88200 - (1187*x^8)/
+  141120 + (15409*x^9)/2328480 - (17929*x^10)/3326400 + (267727*x^11)/
+  59459400 - (304027*x^12)/79279200 + 
+   (341779*x^13)/103062960 - (190409*x^14)/65585520 + (14314177*x^15)/
+  5574769200 - (15715577*x^16)/6861254400 + (108607721*x^17)/
+  52766313600 - (39288323*x^18)/21106525440 + (8485835*x^19)/
+  5012799792 - (3041361*x^20)/1965803840 + 
+   (-(5/3) + (17*x^2)/12 + (11*x^3)/30 - (13*x^4)/120 + (37*x^5)/
+     700 - (17*x^6)/525 + (991*x^7)/44100 - (1187*x^8)/
+     70560 + (15409*x^9)/1164240 - (17929*x^10)/
+     1663200 + (267727*x^11)/29729700 - (304027*x^12)/39639600 + 
+        (341779*x^13)/51531480 - (190409*x^14)/
+     32792760 + (14314177*x^15)/2787384600 - (15715577*x^16)/
+     3430627200 + (108607721*x^17)/26383156800 - (39288323*x^18)/
+     10553262720 + (8485835*x^19)/2506399896 - (3041361*x^20)/
+     982901920)*xt + 
+   (-(37/24) - (17*x)/12 + (11*x^3)/60 - (13*x^4)/240 + (37*x^5)/
+     1400 - (17*x^6)/1050 + (991*x^7)/88200 - (1187*x^8)/
+     141120 + (15409*x^9)/2328480 - (17929*x^10)/
+     3326400 + (267727*x^11)/59459400 - (304027*x^12)/79279200 + 
+        (341779*x^13)/103062960 - (190409*x^14)/
+     65585520 + (14314177*x^15)/5574769200 - (15715577*x^16)/
+     6861254400 + (108607721*x^17)/52766313600 - (39288323*x^18)/
+     21106525440 + (8485835*x^19)/5012799792 - (3041361*x^20)/
+     1965803840)*xt^2 + 
+   (-(11/60) - (11*x)/30 - (11*x^2)/60)*
+  xt^3 + (13/240 + (13*x)/120 + (13*x^2)/240)*
+  xt^4 + (-(37/1400) - (37*x)/700 - (37*x^2)/1400)*
+  xt^5 + (17/1050 + (17*x)/525 + (17*x^2)/1050)*xt^6 + 
+   (-(991/88200) - (991*x)/44100 - (991*x^2)/88200)*
+  xt^7 + (1187/141120 + (1187*x)/70560 + (1187*x^2)/141120)*
+  xt^8 + (-(15409/2328480) - (15409*x)/1164240 - (15409*x^2)/2328480)*
+  xt^9 + 
+   (17929/3326400 + (17929*x)/1663200 + (17929*x^2)/3326400)*
+  xt^10 + (-(267727/59459400) - (267727*x)/29729700 - (267727*x^2)/
+     59459400)*
+  xt^11 + (304027/79279200 + (304027*x)/39639600 + (304027*x^2)/
+     79279200)*xt^12 + 
+   (-(341779/103062960) - (341779*x)/51531480 - (341779*x^2)/
+     103062960)*
+  xt^13 + (190409/65585520 + (190409*x)/32792760 + (190409*x^2)/
+     65585520)*
+  xt^14 + (-(14314177/5574769200) - (14314177*x)/
+     2787384600 - (14314177*x^2)/5574769200)*xt^15 + 
+   (15715577/6861254400 + (15715577*x)/3430627200 + (15715577*x^2)/
+     6861254400)*
+  xt^16 + (-(108607721/52766313600) - (108607721*x)/
+     26383156800 - (108607721*x^2)/52766313600)*xt^17 + 
+   (39288323/21106525440 + (39288323*x)/10553262720 + (39288323*x^2)/
+     21106525440)*
+  xt^18 + (-(8485835/5012799792) - (8485835*x)/
+     2506399896 - (8485835*x^2)/5012799792)*xt^19 + 
+   (3041361/1965803840 + (3041361*x)/982901920 + (3041361*x^2)/
+     1965803840)*xt^20
+    q = 1/2 + x + xt + 2 * x * xt + 1/2*x^2 + x^2 * xt + 1/2 * xt^2 + x * xt^2 + 1/2*x^2*xt^2
+    return x/(1+xt)^2 * ( p + log(xt/x) * q)
+end 
