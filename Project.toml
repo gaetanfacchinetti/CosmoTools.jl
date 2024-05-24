@@ -1,7 +1,7 @@
 name = "CosmoTools"
 uuid = "fab82211-602b-461d-8fab-2b676713216d"
 authors = ["Gaétan Facchinetti"]
-version = "1.0.0-DEV"
+version = "1.0.1-DEV"
 
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
