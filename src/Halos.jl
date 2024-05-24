@@ -22,6 +22,7 @@ export halo_from_mΔ_and_cΔ, halo_from_mΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
 export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
+export der_1_ρ_halo, der_2_ρ_halo, der_1_gravitational_potential
 
 abstract type HaloProfile{T<:Real} end
 
@@ -63,9 +64,20 @@ end
 # dimensionless properties of the halo
 # use analytical expression when possible
 function gravitational_potential(x::Real, xt::Real, p::αβγProfile = nfwProfile) 
-    (p == nfwProfile) && return (log(1+x)/x -log(1+xt)/xt)
+    (p == nfwProfile) && ( (x > 0) && return (log(1+x)/x -log(1+xt)/xt))  && ( (x == 0) && return (1 -log(1+xt)/xt))
     return - QuadGK.quadgk(lnxp -> μ_halo(exp(lnxp), p) / exp(lnxp), x, xt, rtol=1e-5)[1] 
 end
+
+# first derivative of the halo mass density
+der_1_ρ_halo(x::Real, p::αβγProfile = nfwProfile) = -x^(-1-p.γ) * (1+x^p.α)^((p.α + p.β - p.γ)/p.α) * (p.β * x^(p.α) + p.γ)
+
+# second derivative of the halo mass density
+der_2_ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-2-p.γ) * (1+x^p.α)^((-2 p.α-p.β+p.γ)/p.α) * (x^(2 p.α) * p.β *  (1+p.β)+p.γ+p.γ^2+x^p.α * (p.β-p.α * p.β+p.γ+p.α * p.γ+2 p.β * p.γ))
+
+# derivative of the gravitational potential with respect to the mass
+der_1_gravitational_potential(x::Real, xt::Real, p::HaloProfile = nfwProfile) = -μ_halo(x, p) / x^2
+
+
 
 
 function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile, approx::Bool = true) 
