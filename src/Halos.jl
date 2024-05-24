@@ -72,7 +72,7 @@ end
 der_1_ρ_halo(x::Real, p::αβγProfile = nfwProfile) = -x^(-1-p.γ) * (1+x^p.α)^((p.α + p.β - p.γ)/p.α) * (p.β * x^(p.α) + p.γ)
 
 # second derivative of the halo mass density
-der_2_ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-2-p.γ) * (1+x^p.α)^((-2 p.α-p.β+p.γ)/p.α) * (x^(2 p.α) * p.β *  (1+p.β)+p.γ+p.γ^2+x^p.α * (p.β-p.α * p.β+p.γ+p.α * p.γ+2 p.β * p.γ))
+#der_2_ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-2-p.γ) * (1+x^p.α)^((-2 p.α-p.β+p.γ)/p.α) * (x^(2 p.α) * p.β *  (1+p.β)+p.γ+p.γ^2+x^p.α * (p.β-p.α * p.β+p.γ+p.α * p.γ+2 p.β * p.γ))
 
 # derivative of the gravitational potential with respect to the mass
 der_1_gravitational_potential(x::Real, xt::Real, p::HaloProfile = nfwProfile) = -μ_halo(x, p) / x^2
