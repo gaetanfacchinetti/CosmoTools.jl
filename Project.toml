@@ -12,6 +12,7 @@ Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 
 [compat]
 Documenter = "1"
+PolyLog = "2"
 HypergeometricFunctions = "0.3"
 QuadGK = "2"
 Roots = "2"
