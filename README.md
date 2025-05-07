@@ -6,9 +6,9 @@ This is a lightweight Julia module to compute basic cosmological quantities.
 
 ## Installation guide
 
-### Recomanded installation
+### Recommended installation
 
-The recomanded way to install CosmoTools is to use the _local_ registry **CosmoRegistry** following the few steps below in a julia shell
+The recommended way to install CosmoTools is to use the _local_ registry **CosmoRegistry** following the few steps below in a julia shell
 ```julia
 using Pkg
 
