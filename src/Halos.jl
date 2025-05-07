@@ -20,6 +20,7 @@
 export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
 export halo_from_mΔ_and_cΔ, halo_from_mΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
+export rs_from_cΔ_and_mΔ, ρs_from_cΔ
 export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
 

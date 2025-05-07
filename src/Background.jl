@@ -16,13 +16,12 @@
 # If not, see <https://www.gnu.org/licenses/>.
 ##################################################################################
 #
-# Contains functions related to the transfer functions
+# Contains functions related to the background cosmology
 #
 # author: Gaetan Facchinetti
 # email: gaetanfacc@gmail.com
 #
 ##################################################################################
-
 
 
 export BkgCosmology, FLRW, FlatFLRW, planck18_bkg, edsPlanck18_bkg, convert_cosmo
@@ -85,9 +84,9 @@ hubble_E2(z::Real, Ω_m0::Real, Ω_r0::Real, Ω_Λ0::Real, Ω_k0::Real) = Ω_m0 
 Ω_Λ(z::Real, Ω_m0::Real, Ω_r0::Real, Ω_Λ0::Real, Ω_k0::Real) = Ω_Λ0  / hubble_E2(z, Ω_m0, Ω_r0, Ω_Λ0, Ω_k0)
 
 @doc raw"""
-    FlatFLRW(h, Ω_χ0, Ω_b0; T0_CMB_K = 2.72548, Neff = 3.04)
+    FLRW(h, Ω_χ0, Ω_b0; T0_CMB_K = 2.72548, Neff = 3.04)
 
-Creates a FlatFLRW instance
+Creates a FLRW instance
 
 # Arguments
 - `h::Real` : hubble parameter (dimensionless)
@@ -127,14 +126,14 @@ end
 #########################################################
 # Predefinition of some cosmologies
 """
-    planck18_bkg::FlatFLRW = FlatFLRW(0.6736, 0.26447, 0.04930)
+    planck18_bkg::FLRW = FLRW(0.6736, 0.26447, 0.04930)
 
 Flat FLRW cosmology with [*Planck18*](https://arxiv.org/abs/1807.06209) parameters
 """
 const planck18_bkg::FLRW = FLRW(0.6736, 0.26447, 0.04930)
 
 """
-    edsplanck18_bkg::FlatFLRW  = FlatFLRW(0.6736, 0.3, 0) 
+    edsplanck18_bkg::FLRW  = FLRW(0.6736, 0.3, 0) 
 
 Flat FLRW cosmology with [*Planck18*](https://arxiv.org/abs/1807.06209) parameters and no baryons
 """
