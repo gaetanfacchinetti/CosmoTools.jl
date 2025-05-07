@@ -115,22 +115,8 @@ end
 function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile, approx::Bool = true) 
     
     (x >= xt) && (return 0.0)
-
-    #if (p == nfwProfile) && approx
-
-        # precision at more than 1e-8
-        #if (xt <= 1e-3)
-        #    res = _vd2_nfw(x, xt)
-        #elseif ((xt > 1e-3) && (x > 1e-2 * xt))
-        #    res = (x - xt)*((1 + xt)^2 + x*(2 + 3*xt*(4 + 3*xt)) +  x^2*(1 + xt*(9 + 7*xt))) + (1/(x*xt))*((1 + x)*(1 + xt)*(xt^2*(1 + xt - x*(3 + (3 + 5*x)*xt))*log(1 + x) + 3*x^2*(1 + x)*xt^2*(1 + xt)*log(1 + x)^2 +  x^2*(-((1 + x)*log(1 + xt)) + xt*(3*(1 + x)*log(1 + xt) + xt*(x*log((1 + 1/x)*xt) + log(xt/x) + 5*x*log(1 + xt) - 3*(1 + x)*(1 + xt)*log(1 + xt)^2 + 5*log((1 + xt)/(1 + x)) + xt*log(xt/(x + x*xt)) + x*xt*log((xt + x*xt)/(x + x*xt)))))))
-        #    res = 0.5 * res * ρ_halo(xt, p) + 3*x*(1 + x)^2*(PolyLog.reli2(-x) - PolyLog.reli2(-xt))
-        #else
-        #    res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=1e-5)[1]  / ρ_halo(x, p)
-        #end
-
-    #else
+  
     res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=1e-5)[1]  / ρ_halo(x, p)
-    #end
 
     (res < 0) && throw(DomainError("The square of the velocity dispersion cannot be negative (for x = " * string(x) * ", xt = " * string(xt) * ")"))
     
@@ -176,9 +162,7 @@ Base.show(io::IO, h::Halo{<:Real}) = print(io, "Halo: \n  - " * string(h.hp) * "
 Halo(hp::HaloProfile, ρs::Real, rs::Real) = Halo(hp, promote(ρs, rs)...)
 
 function halo_from_mΔ_and_cΔ(hp::HaloProfile, mΔ::Real, cΔ::Real;  Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0)
-    ρs = ρs_from_cΔ(cΔ, hp, Δ, ρ_ref)
-    rs = rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref)
-    return Halo(hp, ρs, rs)
+    return Halo(hp, ρs_from_cΔ(cΔ, hp, Δ, ρ_ref), rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref))
 end
 
 ρ_halo(r::Real, h::Halo{<:Real}) = h.ρs * ρ_halo(r/h.rs, h.hp)
@@ -203,10 +187,10 @@ velocity_dispersion(r::Real, rt::Real, h::Halo) = sqrt(4 * π * h.ρs * h.rs^2 *
 velocity_dispersion_kms(r::Real, rt::Real, h::Halo) = velocity_dispersion(r, rt, h) * MPC_TO_KM
 
 """ gravitational potential in (Mpc / s)^2 """
-ψ_halo(r::Real, rt::Real, h::Halo) = - 4 * π * h.ρs * h.rs^2 * G_NEWTON * ψ_halo(r/h.rs, rt/h.rs, h.hp) 
+gravitational_potential(r::Real, rt::Real, h::Halo) = - 4 * π * h.ρs * h.rs^2 * G_NEWTON * ψ_halo(r/h.rs, rt/h.rs, h.hp) 
 
 """ gravitational potential in (km / s)^2 """
-ψ_halo_kms(r::Real, rt::Real, h::Halo) = ψ_halo(r, rt, h) * (MPC_TO_KM^2)
+gravitational_potential_kms(r::Real, rt::Real, h::Halo) = ψ_halo(r, rt, h) * (MPC_TO_KM^2)
 
 """ escape velocity in (Mpc / s) """
 escape_velocity(r::Real, rt::Real, h::Halo) = sqrt(2*abs(ψ_halo(r, rt, h)))
