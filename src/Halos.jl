@@ -23,6 +23,7 @@ export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ
 export rs_from_cΔ_and_mΔ, ρs_from_cΔ
 export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
+export get_halo_profile_type
 
 abstract type HaloProfile{T<:Real} end
 
@@ -42,6 +43,8 @@ Base.length(::HaloProfile) = 1
 Base.iterate(iter::HaloProfile) = (iter, nothing)
 Base.iterate(::HaloProfile, state::Nothing) = nothing
 
+get_halo_profile_type(::HaloProfile{T}) where {T<:Real} = T
+
 # overrinding print function
 Base.show(io::IO, hp::αβγProfile{<:Real}) = print(io, "αβγProfile: α = " * string(hp.α) * ", β = " * string(hp.β) * ", γ = " * string(hp.γ))
 
@@ -49,9 +52,9 @@ Base.show(io::IO, hp::αβγProfile{<:Real}) = print(io, "αβγProfile: α = " 
 αβγProfile(name::String, α::Real, β::Real, γ::Real) = αβγProfile(name, promote(α, β, γ)...)
 
 ## definition of densities and mass profiles
-const nfwProfile::αβγProfile = αβγProfile("NFW_Profile", 1, 3, 1)
-const coreProfile::αβγProfile = αβγProfile("Core_Profile", 1, 3, 0)
-const plummerProfile::αβγProfile = αβγProfile("Plummer_Profile", 2, 5, 0)
+const nfwProfile::αβγProfile{Int} = αβγProfile("NFW_Profile", 1, 3, 1)
+const coreProfile::αβγProfile{Int} = αβγProfile("Core_Profile", 1, 3, 0)
+const plummerProfile::αβγProfile{Int} = αβγProfile("Plummer_Profile", 2, 5, 0)
 
 # Density profile and mass
 ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-p.γ) * (1+x^p.α)^(-(p.β - p.γ)/p.α)
@@ -143,12 +146,12 @@ end
 cΔ_from_ρs(ρs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real=200, cosmo::Cosmology = plnack18) = cΔ_from_ρs(ρs, hp, Δ, cosmo.bkg.ρ_c0)
 
 mΔ_from_ρs_and_rs(ρs::Real, rs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = 4 * pi * ρs * rs^3 * μ_halo(cΔ_from_ρs(ρs, hp, Δ, ρ_ref), hp)
-ρs_from_cΔ(cΔ::Real, hp::HaloProfile{<:Real} = nfwProfile , Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = Δ * ρ_ref  / 3 * cΔ^3 / μ_halo(cΔ, hp) 
+ρs_from_cΔ(cΔ::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = Δ * ρ_ref  / 3 * cΔ^3 / μ_halo(cΔ, hp) 
 rs_from_cΔ_and_mΔ(cΔ::Real, mΔ::Real, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) =  (3 * mΔ / (4 * π * Δ * ρ_ref))^(1 // 3) / cΔ 
 rΔ_from_ρs_and_rs(ρs::Real, rs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = (3 * mΔ_from_ρs_and_rs(ρs, rs, hp, Δ, ρ_ref) / (4*π*Δ*ρ_ref))^(1//3)
 
-struct Halo{T<:Real}
-    hp::HaloProfile
+struct Halo{T<:AbstractFloat, S<:Real}
+    hp::HaloProfile{S}
     ρs::T
     rs::T
 end
@@ -157,22 +160,22 @@ Base.length(::Halo) = 1
 Base.iterate(iter::Halo) = (iter, nothing)
 Base.iterate(::Halo, state::Nothing) = nothing
 
-Base.show(io::IO, h::Halo{<:Real}) = print(io, "Halo: \n  - " * string(h.hp) * "\n  - ρs = " * string(h.ρs) * " Msun/Mpc^3, rs = " * string(h.rs) * " Mpc \n  - m200 (planck18) = " * string(mΔ(h, 200, planck18)) * " Msun, c200 (planck18) = " * string(cΔ(h, 200, planck18)))
+Base.show(io::IO, h::Halo{<:AbstractFloat, <:Real}) = print(io, "Halo: \n  - " * string(h.hp) * "\n  - ρs = " * string(h.ρs) * " Msun/Mpc^3, rs = " * string(h.rs) * " Mpc \n  - m200 (planck18) = " * string(mΔ(h, 200, planck18)) * " Msun, c200 (planck18) = " * string(cΔ(h, 200, planck18)))
 
-Halo(hp::HaloProfile, ρs::Real, rs::Real) = Halo(hp, promote(ρs, rs)...)
+Halo(hp::HaloProfile{S}, ρs::Real, rs::Real) where {S<:Real} = Halo(hp, promote(ρs, rs)...)
 
-function halo_from_mΔ_and_cΔ(hp::HaloProfile, mΔ::Real, cΔ::Real;  Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0)
-    return Halo(hp, ρs_from_cΔ(cΔ, hp, Δ, ρ_ref), rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref))
+function halo_from_mΔ_and_cΔ(hp::HaloProfile{S}, mΔ::T, cΔ::T;  Δ::T = T(200), ρ_ref::T = planck18_bkg.ρ_c0) where {T<:AbstractFloat, S<:Real}
+    return Halo{T, S}(hp, convert(T, ρs_from_cΔ(cΔ, hp, Δ, ρ_ref)), convert(T, rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref)))
 end
 
-ρ_halo(r::Real, h::Halo{<:Real}) = h.ρs * ρ_halo(r/h.rs, h.hp)
-m_halo(r::Real, h::Halo{<:Real}) = 4.0 * π * h.ρs * h.rs^3 * μ_halo(r/h.rs, h.hp)
-mΔ(h::Halo{<:Real}, Δ::Real, ρ_ref::Real) = mΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
-mΔ(h::Halo{<:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = mΔ(h, Δ, cosmo.bkg.ρ_c0)
-cΔ(h::Halo{<:Real}, Δ::Real, ρ_ref::Real) = cΔ_from_ρs(h.ρs, h.hp, Δ, ρ_ref)
-cΔ(h::Halo{<:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = cΔ(h, Δ, cosmo.bkg.ρ_c0)
-rΔ(h::Halo{<:Real}, Δ::Real, ρ_ref::Real) = rΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
-rΔ(h::Halo{<:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = rΔ(h, Δ, cosmo.bkg.ρ_c0)
+ρ_halo(r::Real, h::Halo{<:AbstractFloat, <:Real}) = h.ρs * ρ_halo(r/h.rs, h.hp)
+m_halo(r::Real, h::Halo{<:AbstractFloat, <:Real}) = 4.0 * π * h.ρs * h.rs^3 * μ_halo(r/h.rs, h.hp)
+mΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = mΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
+mΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = mΔ(h, Δ, cosmo.bkg.ρ_c0)
+cΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = cΔ_from_ρs(h.ρs, h.hp, Δ, ρ_ref)
+cΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = cΔ(h, Δ, cosmo.bkg.ρ_c0)
+rΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = rΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
+rΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = rΔ(h, Δ, cosmo.bkg.ρ_c0)
 
 ρs(h::Halo) = h.ρs * ρ_0
 rs(h::Halo) = h.rs * r_0

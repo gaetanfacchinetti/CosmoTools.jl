@@ -32,14 +32,14 @@ export growth_factor, growth_factor_Carroll
 export lookback_time, lookback_redshift, universe_age
 
 @doc raw"""
-    BkgCosmology
+    BkgCosmology{T<:Real}
 
 Abstract type: generic background cosmology 
 """
 abstract type BkgCosmology{T<:Real} end
 
 @doc raw"""
-    FLRW{T<:Real} <: BkgCosmology
+    FLRW{T<:Real} <: BkgCosmology{T}
 
 Defines a flat FLRW background cosmology
 """
@@ -73,6 +73,8 @@ Base.length(::BkgCosmology) = 1
 Base.iterate(iter::BkgCosmology) = (iter, nothing)
 Base.iterate(::BkgCosmology, state::Nothing) = nothing
 
+Base.eltype(::BkgCosmology{T}) where {T<:Real} = T
+
 """ Convert bkg_cosmo object attributes to another type """
 convert_cosmo(::Type{T}, bkg_cosmo::FLRW{<:Real} = planck18_bkg) where {T<:Real} = FLRW{T}([convert(T, getfield(bkg_cosmo, field)) for field in fieldnames(typeof(bkg_cosmo))]...)
 
@@ -94,6 +96,9 @@ Creates a FLRW instance
 - `Ω_b0::Real`: baryon abundance today (dimensionless)
 - `T0_CMB_K::Real`: temperature of the CMB today (in Kelvin)
 - `Neff::Real`: effective number of neutrinos (dimensionless)
+
+# Returns
+- A FLRW structure
 """
 function FLRW(h::Real, Ω_χ0::Real, Ω_b0::Real, Ω_k0::Real=0; T0_CMB_K::Real = 2.72548, Neff::Real = 3.04, EdS::Bool = false)
     
@@ -130,39 +135,98 @@ end
 
 Flat FLRW cosmology with [*Planck18*](https://arxiv.org/abs/1807.06209) parameters
 """
-const planck18_bkg::FLRW = FLRW(0.6736, 0.26447, 0.04930)
+const planck18_bkg::FLRW{Float64} = FLRW(0.6736, 0.26447, 0.04930)
 
 """
     edsplanck18_bkg::FLRW  = FLRW(0.6736, 0.3, 0) 
 
 Flat FLRW cosmology with [*Planck18*](https://arxiv.org/abs/1807.06209) parameters and no baryons
 """
-const edsPlanck18_bkg::FLRW  = FLRW(0.6736, 0.3, 0, EdS = true) 
+const edsPlanck18_bkg::FLRW{Float64}  = FLRW(0.6736, 0.3, 0, EdS = true) 
 #########################################################
 
 
 #########################################################
 # Definition of the hubble parameter and some other related quantities
 
-""" CMB temperature (in K) of the Universe at redshift `z` (by default z=0) for the cosmology `bkg_cosmo` """
+@doc raw"""
+    temperature_CMB_K(z, bkg_cosmo)
+
+CMB temperature (in K) of the Universe at redshift `z`.
+
+# Arguments
+- `z::Real`: Redshift (default: 0.0)
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
 temperature_CMB_K(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg)  = bkg_cosmo.T0_CMB_K * (1+z)
 
-""" Hubble constant H0 (in km/s/Mpc) for the cosmology `bkg_cosmo` """
+
+@doc raw"""
+    hubble_H0(bkg_cosmo)
+
+Hubble constant H₀ (in km/s/Mpc) for the cosmology.
+
+# Arguments
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
 hubble_H0(bkg_cosmo::BkgCosmology = planck18_bkg) = 100 * bkg_cosmo.h
 
-""" Hubble constant H0 (in 1/s) for the cosmology `bkg_cosmo` """
+
+@doc raw"""
+    hubble_H0_s(bkg_cosmo)
+
+Hubble constant H₀ (in 1/s) for the cosmology.
+
+# Arguments
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
 hubble_H0_s(bkg_cosmo::BkgCosmology = planck18_bkg) = hubble_H0(bkg_cosmo) * KM_TO_MPC
 
-""" Hubble evolution (no dimension) of the Universe squared at redshift `z` (by default z=0) for the cosmology `bkg_cosmo` """
+
+@doc raw"""
+    hubble_E2(z, bkg_cosmo)
+
+Squared Hubble evolution function E²(z) (dimensionless) at redshift `z`.
+
+# Arguments
+- `z::Real`: Redshift (default: 0.0)
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
 hubble_E2(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg) = hubble_E2(z, bkg_cosmo.Ω_m0, bkg_cosmo.Ω_r0, bkg_cosmo.Ω_Λ0, bkg_cosmo.Ω_k0)
 
-""" Hubble evolution (no dimension) of the Universe at redshift `z` (by default z=0) for the cosmology `bkg_cosmo` """
+
+@doc raw"""
+    hubble_E(z, bkg_cosmo)
+
+Hubble evolution function E(z) (dimensionless) at redshift `z`.
+
+# Arguments
+- `z::Real`: Redshift (default: 0.0)
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
 hubble_E(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg) = sqrt(hubble_E2(z, bkg_cosmo))
 
-""" Hubble rate H(z) (in km/s/Mpc) of the Universe at redshift `z` (by default z=0) for the cosmology `bkg_cosmo` """
-hubble_H(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg) = hubble_E(z, bkg_cosmo) .* hubble_H0(bkg_cosmo) 
 
-""" k at equivalence between matter and radiation """
+@doc raw"""
+    hubble_H(z, bkg_cosmo)
+
+Hubble rate H(z) (in km/s/Mpc) of the Universe at redshift `z`.
+
+# Arguments
+- `z::Real`: Redshift (default: 0.0)
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
+hubble_H(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg) = hubble_E(z, bkg_cosmo) .* hubble_H0(bkg_cosmo)
+
+
+@doc raw"""
+    k_eq_mr(bkg_cosmo)
+
+Wave number at matter–radiation equality.
+
+# Arguments
+- `bkg_cosmo::BkgCosmology`: Cosmological background model
+"""
 k_eq_mr(bkg_cosmo::BkgCosmology) = bkg_cosmo.k_eq_mr
 #########################################################
 
@@ -173,15 +237,53 @@ k_eq_mr(bkg_cosmo::BkgCosmology) = bkg_cosmo.k_eq_mr
 
 export Species, Radiation, Photons, Neutrinos, Matter, ColdDarkMatter, Baryons, DarkEnergy, Curvature
 
+@doc raw"""
+    Species
+
+Abstract type: generic species populating the Universe
+"""
 abstract type Species end
+
+@doc raw"""
+    Radiation <: Species
+"""
 abstract type Radiation <: Species end
+
+@doc raw"""
+    Photons <: Radiation
+"""
 abstract type Photons <: Radiation end
+
+@doc raw"""
+    Neutrinos <: Radiation
+"""
 abstract type Neutrinos <: Radiation end
+
+@doc raw"""
+    Matter <: Species
+"""
 abstract type Matter <: Species end
+
+@doc raw"""
+    ColdDarkMatter <: Matter
+"""
 abstract type ColdDarkMatter <: Matter end
+
+@doc raw"""
+    Baryons <: Matter
+"""
 abstract type Baryons <: Matter end
+
+@doc raw"""
+    DarkEnergy <: Species
+"""
 abstract type DarkEnergy <: Species end
+
+@doc raw"""
+    Curvature <: Species
+"""
 abstract type Curvature <: Species end
+
 
 Ω(z::Real, n::Int, Ω0::Real, bkg_cosmo::BkgCosmology) = Ω0 * (1+z)^n / hubble_E2(z, bkg_cosmo)
 
@@ -232,9 +334,29 @@ mean_ρ(::Type{T}, z::Real = 0, bkg_cosmo::BkgCosmology = planck18_bkg) where {T
 #########################################################
 # Definition of specific time quantities
 
-""" Convert redshift to scale parameter """
+@doc raw""" 
+    z_to_a(z)
+
+Convert redshift z to scale parameter a. Simple implementation of
+
+``a = \frac{1}{1+z}``
+
+# Arguments
+- `z::Real` : redshift (dimensionless)
+"""
 z_to_a(z::Real) = 1 / (1 + z)
-""" Convert scale parameter to redshift """
+
+
+@doc raw""" 
+    a_to_z(z)
+
+Convert scale parameter to redshift. Simple implementation of
+
+``z = \frac{1}{a}-1``
+
+# Arguments
+- `a::Real` : scale factor (dimensionless)
+"""
 a_to_z(a::Real) = 1 / a - 1
 
 z_eq_mr(bkg_cosmo::BkgCosmology = planck18_bkg) = bkg_cosmo.z_eq_mr
@@ -244,13 +366,49 @@ a_eq_Λm(bkg_cosmo::BkgCosmology = planck18_bkg) = z_to_a(bkg_cosmo.z_eq_Λm)
 
 δt_s(a0::Real, a1::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = QuadGK.quadgk(a -> 1 / hubble_E(a_to_z(a), bkg_cosmo) / a, a0, a1, rtol=1e-3; kws...)[1] / (hubble_H0(bkg_cosmo) * KM_TO_MPC)
 
-""" age of the universe (s)"""
-universe_age(z::Float64 = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = δt_s(0, z_to_a(z), bkg_cosmo; kws...)
+@doc raw""" 
 
-""" lookback time of the Universe (s) """
+    universe_age(z, bkg_cosmo; kws...)
+    
+age of the universe (s)
+
+# Arguments
+- `z::Float64` : redshift (dimensionless), default 0.0
+- `bkg_cosmo::BkgCosmology` : background cosmology (dimensionless), default planck18_bkg
+
+# Kwargs
+- Any argument that can be passed to `QuadGK.quadgk'
+"""
+universe_age(z::Real = 0.0, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = δt_s(0, z_to_a(z), bkg_cosmo; kws...)
+
+@doc raw""" 
+
+    lookback_time(z, bkg_cosmo; kws...)
+    
+lookback time of the Universe (s)
+
+# Arguments
+- `z::Real` : redshift (dimensionless)
+- `bkg_cosmo::BkgCosmology` : background cosmology (dimensionless), default planck18_bkg
+
+# Kwargs
+- Any argument that can be passed to `QuadGK.quadgk'
+"""
 lookback_time(z::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = δt_s(z_to_a(z), 1, bkg_cosmo; kws...)
 
-""" lookback redshift of the Universe for t in (s) """
+@doc raw""" 
+
+    lookback_lookback_redshift(t, bkg_cosmo; kws...)
+    
+lookback redshift of the Universe for t in (s)
+
+# Arguments
+- `t::Real` : time (s)
+- `bkg_cosmo::BkgCosmology` : background cosmology (dimensionless), default planck18_bkg
+
+# Kwargs
+- Any argument that can be passed to `QuadGK.quadgk'
+"""
 lookback_redshift(t::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = exp(Roots.find_zero(lnz -> lookback_time(exp(lnz), bkg_cosmo; kws...)-t, (-5, 10), Roots.Bisection())) 
 #########################################################
 
@@ -265,8 +423,11 @@ lookback_redshift(t::Real, bkg_cosmo::BkgCosmology = planck18_bkg; kws...) = exp
     Corresponds to D1(a=1) with the definition of Dodelson 2003
 
 # Arguments
-- z: redshift
-- bkg_cosmo: background cosmology (default Planck18)
+- `z::Real` : redshift (dimensionless)
+- `bkg_cosmo::BkgCosmology` : background cosmology, default planck18_bkg
+
+# Kwargs
+- Any argument that can be passed to `QuadGK.quadgk'
 """
 function growth_factor(z::Real, bkg_cosmo::BkgCosmology = planck18_bkg; rtol=1e-6, kws...)::Real
     norm = 2.5 * bkg_cosmo.Ω_m0 * sqrt(bkg_cosmo.Ω_m0 * (1+z)^3 + bkg_cosmo.Ω_Λ0)
@@ -281,8 +442,8 @@ end
     Corresponds to D1(a=1) with the definition of Dodelson 2003
 
 # Arguments
-- z: redshift
-- bkg_cosmo: background cosmology (default Planck18)
+- `z::Real` : redshift (dimensionless)
+- `bkg_cosmo::BkgCosmology` : background cosmology, default planck18_bkg
 """
 function growth_factor_Carroll(z::Real, bkg_cosmo=BkgCosmology = planck18_bkg)::Real
     # Abundances in a Universe without radiation

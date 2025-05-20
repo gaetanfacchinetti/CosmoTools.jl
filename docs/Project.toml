@@ -1,0 +1,3 @@
+[deps]
+CosmoTools = "fab82211-602b-461d-8fab-2b676713216d"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

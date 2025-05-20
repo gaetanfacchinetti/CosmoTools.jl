@@ -20,6 +20,7 @@
 export Cosmology, planck18, curvature_power_spectrum, matter_power_spectrum, power_spectrum_ΛCDM
 export window_function, Window, TopHatWindow, SharpKWindow, GaussianWindow, radius_from_mass, mass_from_radius, dradius_dmass
 export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_M, dσ_mps_dM
+export get_cosmology_type
 
 #####################
 # COSMOLOGY STRUCTURE
@@ -31,17 +32,26 @@ export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_
 
 Defines a generic cosmology
 """
-struct Cosmology{T<:Real}
+struct Cosmology{T<:AbstractFloat, BKG<:BkgCosmology{T}}
     name::String
-    bkg::BkgCosmology{T}
+    bkg::BKG
     power_spectrum::Function
     transfer_function_model::TransferFunctionModel
 end
 
 
-function Cosmology(name::String, bkg::BkgCosmology, power_spectrum::Function, ::Type{T} = EH98) where {T<:TransferFunctionModel}
-    return Cosmology(name, bkg, power_spectrum, T(bkg))
+function Cosmology(
+    name::String, 
+    bkg::BkgCosmology, 
+    power_spectrum::Function, 
+    ::Type{TF} = EH98
+    ) where {TF<:TransferFunctionModel}
+
+    T = eltype(bkg)
+    return Cosmology{T, BkgCosmology{T}}(name, bkg, power_spectrum, TF(bkg))
 end
+
+get_cosmology_type(::Cosmology{T, BKG}) where {T<:AbstractFloat, BKG<:BkgCosmology{T}} = T, BKG
 
 const planck18::Cosmology = Cosmology("PLANCK18", planck18_bkg, k->power_spectrum_ΛCDM(k, 1e-10*exp(3.044), 0.9649), EH98_planck18)
 
