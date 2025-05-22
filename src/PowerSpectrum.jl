@@ -51,6 +51,10 @@ function Cosmology(
     return Cosmology{T, BkgCosmology{T}}(name, bkg, power_spectrum, TF(bkg))
 end
 
+Base.length(::Cosmology) = 1
+Base.iterate(iter::Cosmology) = (iter, nothing)
+Base.iterate(::Cosmology, state::Nothing) = nothing
+
 get_cosmology_type(::Cosmology{T, BKG}) where {T<:AbstractFloat, BKG<:BkgCosmology{T}} = T, BKG
 
 const planck18::Cosmology = Cosmology("PLANCK18", planck18_bkg, k->power_spectrum_ΛCDM(k, 1e-10*exp(3.044), 0.9649), EH98_planck18)
