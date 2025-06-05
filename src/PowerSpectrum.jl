@@ -20,7 +20,7 @@
 export Cosmology, planck18, curvature_power_spectrum, matter_power_spectrum, power_spectrum_ΛCDM
 export window_function, Window, TopHatWindow, SharpKWindow, GaussianWindow, radius_from_mass, mass_from_radius, dradius_dmass
 export σ2_mps, dσ2_mps_dR, σ_mps, dσ_mps_dR, σ2_mps_M, dσ2_mps_dM, σ_mps_M, dσ_mps_dM
-export get_cosmology_type
+export get_cosmology_type, dflt_cosmo
 
 #####################
 # COSMOLOGY STRUCTURE
@@ -57,7 +57,15 @@ Base.iterate(::Cosmology, state::Nothing) = nothing
 
 get_cosmology_type(::Cosmology{T, BKG}) where {T<:AbstractFloat, BKG<:BkgCosmology{T}} = T, BKG
 
-const planck18::Cosmology = Cosmology("PLANCK18", planck18_bkg, k->power_spectrum_ΛCDM(k, 1e-10*exp(3.044), 0.9649), EH98_planck18)
+convert_cosmo(::Type{T}, cosmo::Cosmology) where {T<:AbstractFloat} = Cosmology(cosmo.name, convert_cosmo(T, cosmo.bkg), cosmo.power_spectrum, convert_tf(T, cosmo.transfer_function_model))
+
+const planck18 = Cosmology("PLANCK18", planck18_bkg, k->power_spectrum_ΛCDM(k, 1e-10*exp(3.044), 0.9649), EH98_planck18)
+const planck18_f32 = Cosmology("PLANCK18", planck18_bkg_f32, k->power_spectrum_ΛCDM(k, 1f-10*exp(3.044f0), 0.9649f0), EH98_planck18_f32)
+
+dflt_cosmo(::Type{Float64}) = planck18
+dflt_cosmo(::Type{Float32}) = planck18_f32
+
+dflt_cosmo(::Type{T} = Float64) where {T<:AbstractFloat} = dflt_cosmo(T)
 
 
 ######################################
@@ -65,13 +73,13 @@ const planck18::Cosmology = Cosmology("PLANCK18", planck18_bkg, k->power_spectru
 ######################################
 
 """ ΛCDM power-law power spectrum (dimensionless) at k (in 1/Mpc) """
-function power_spectrum_ΛCDM(k::Real, amplitude::Real = 1e-10*exp(3.044), index::Real = 0.9649)
-    return amplitude * (k / 0.05)^(index-1)
+function power_spectrum_ΛCDM(k::T, amplitude::T = T(1e-10)*exp(T(3.044)), index::T = T(0.9649)) where {T<:AbstractFloat}
+    return amplitude * (k / T(0.05))^(index-1)
 end
 
 """ Curvature power spectrum (in Mpc^3) at k (in 1/Mpc) """
-function curvature_power_spectrum(k::Real, power_spectrum::Function = power_spectrum_ΛCDM)
-    return 2.0 * pi^2 * power_spectrum(k) / k^3
+function curvature_power_spectrum(k::T, power_spectrum::Function = power_spectrum_ΛCDM) where {T<:AbstractFloat}
+    return T(2 * π)^2 * power_spectrum(k) / k^3
 end 
 
 

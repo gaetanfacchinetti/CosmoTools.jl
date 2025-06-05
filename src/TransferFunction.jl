@@ -23,11 +23,11 @@
 #
 ##################################################################################
 
-export transfer_function, TrivialTF, EH98, TransferFunctionModel, EH98_planck18
+export transfer_function, TrivialTF, EH98, TransferFunctionModel, EH98_planck18, convert_tf
 
-abstract type TransferFunctionModel end
+abstract type TransferFunctionModel{T<:AbstractFloat} end
 
-struct EH98{T<:Real} <: TransferFunctionModel
+struct EH98{T<:AbstractFloat} <: TransferFunctionModel{T}
     
     # Parameters directly related to the BkgCosmology
     Ω_m0_h2::T
@@ -46,10 +46,19 @@ struct EH98{T<:Real} <: TransferFunctionModel
 
 end
 
-g_func(y::Real) = (-6.0*sqrt(1.0+y) + (2.0+3.0*y)*log((sqrt(1.0+y)+1)/(sqrt(1.0+y)-1.0))) * y
+Base.length(::TransferFunctionModel) = 1
+Base.iterate(iter::TransferFunctionModel) = (iter, nothing)
+Base.iterate(::TransferFunctionModel, state::Nothing) = nothing
+
+Base.eltype(::TransferFunctionModel{T}) where {T<:AbstractFloat} = T
+
+""" Convert tf object attributes to another type """
+convert_tf(::Type{T}, tf::TransferFunctionModel = planck18_bkg) where {T<:AbstractFloat} = EH98{T}([convert(T, getfield(tf, field)) for field in fieldnames(typeof(tf))]...)
+
+g_func(y::AbstractFloat) = (-6.0*sqrt(1.0+y) + (2.0+3.0*y)*log((sqrt(1.0+y)+1)/(sqrt(1.0+y)-1.0))) * y
 
 
-function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_eq_mr::Real, ::Type{T}; T0_CMB_K::Real = 2.72548) where {T<:Real}
+function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_eq_mr::Real, ::Type{T}; T0_CMB_K::Real = 2.72548) where {T<:AbstractFloat}
     
     Θ27::T = T0_CMB_K / 2.7
 
@@ -82,7 +91,7 @@ function EH98(Ω_m0_h2::Real, Ω_b0_h2::Real, Ω_χ0_h2::Real, z_eq_mr::Real, k_
 end
 
 
-function EH98(bkg_cosmo::FLRW{<:Real}, ::Type{T} = Float64) where {T<:Real}
+function EH98(bkg_cosmo::FLRW{<:AbstractFloat}, ::Type{T} = Float64) where {T<:Real}
 
     Ω_m0_h2::T = bkg_cosmo.Ω_m0 * bkg_cosmo.h^2
     Ω_b0_h2::T = bkg_cosmo.Ω_b0 * bkg_cosmo.h^2
@@ -95,6 +104,8 @@ function EH98(bkg_cosmo::FLRW{<:Real}, ::Type{T} = Float64) where {T<:Real}
 end
 
 const EH98_planck18 = EH98(planck18_bkg)
+const EH98_planck18_f32 = EH98(planck18_bkg_f32, Float32)
+const EH98_planck18_f16 = EH98(planck18_bkg_f16, Float16)
 
 function transfer_0_tilde(q::Real, α_c::Real, β_c::Real)::Real
     C = 14.2 / α_c + 386.0 / (1.0 + 69.9 * q^1.08 )
@@ -144,7 +155,7 @@ function transfer_function(k::Real, p::EH98 = EH98_planck18; with_baryons::Bool 
 end
 
 ## Define here the trivial transfer function
-struct TrivialTF <: TransferFunctionModel end
+struct TrivialTF{T<:AbstractFloat} <: TransferFunctionModel{T} end
 TrivialTF(bkg_cosmo::BkgCosmology) = TrivialTF()
 transfer_function(k::Real, p::TrivialTF; with_baryons::Bool = true) = 1
 

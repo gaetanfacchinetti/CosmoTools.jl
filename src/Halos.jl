@@ -21,9 +21,9 @@ export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
 export halo_from_mΔ_and_cΔ, halo_from_mΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
 export rs_from_cΔ_and_mΔ, ρs_from_cΔ
-export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
+export velocity_dispersion, velocity_dispersion_kms, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
 export gravitational_potential_kms
-export get_halo_profile_type
+export get_halo_profile_type, GenericHalo
 
 abstract type HaloProfile{T<:Real} end
 
@@ -57,18 +57,18 @@ const coreProfile::αβγProfile{Int} = αβγProfile("Core_Profile", 1, 3, 0)
 const plummerProfile::αβγProfile{Int} = αβγProfile("Plummer_Profile", 2, 5, 0)
 
 # Density profile and mass
-ρ_halo(x::Real, p::αβγProfile = nfwProfile) = x^(-p.γ) * (1+x^p.α)^(-(p.β - p.γ)/p.α)
+ρ_halo(x::T, p::αβγProfile = nfwProfile) where {T<:AbstractFloat} = x^(-p.γ) * (1+x^p.α)^(-T((p.β - p.γ)/p.α))
 
-function μ_halo(x::Real, p::αβγProfile = nfwProfile) 
-    (p == nfwProfile) && return (x < 1e-3 ? (x^2/2 - (2 * x^3)/3 + (3 * x^4)/4 - (4 * x^5)/5) : (log(1+x) - x/(1+x)))
-    return HypergeometricFunctions._₂F₁((3 - p.γ)/p.α, (p.β - p.γ)/p.α, (3 + p.α - p.γ)/p.α, -x^p.α) * x^(3-p.γ) / (3-p.γ)
+function μ_halo(x::T, p::αβγProfile = nfwProfile) where {T<:AbstractFloat}
+    (p == nfwProfile) && return (x < T(1e-3) ? (x^2/2 - (2 * x^3)/3 + (3 * x^4)/4 - (4 * x^5)/5) : (log(1+x) - x/(1+x)))
+    return HypergeometricFunctions._₂F₁(T((3 - p.γ)/p.α), T((p.β - p.γ)/p.α), T((3 + p.α - p.γ)/p.α), -x^p.α) * T(x^(3-p.γ) / (3-p.γ))
 end
 
 # dimensionless properties of the halo
 # use analytical expression when possible
-function ψ_halo(x::Real, xt::Real, p::αβγProfile = nfwProfile) 
+function ψ_halo(x::T, xt::T, p::αβγProfile = nfwProfile) where {T<:AbstractFloat}
     (p == nfwProfile) && ( (x > 0) && return (log(1+x)/x -log(1+xt)/xt))  && ( (x == 0) && return (1 -log(1+xt)/xt))
-    return - QuadGK.quadgk(lnxp -> μ_halo(exp(lnxp), p) / exp(lnxp), x, xt, rtol=1e-5)[1] 
+    return - convert(T, QuadGK.quadgk(lnxp -> μ_halo(exp(lnxp), p) / exp(lnxp), x, xt, rtol=1e-5)[1])
 end
 
 
@@ -115,11 +115,11 @@ end
 #-------------
 
 
-function velocity_dispersion(x::Real, xt::Real, p::αβγProfile = nfwProfile, approx::Bool = true) 
+function velocity_dispersion(x::T, xt::T, p::αβγProfile = nfwProfile) where {T<:AbstractFloat}
     
-    (x >= xt) && (return 0.0)
+    (x >= xt) && (return T(0))
   
-    res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=1e-5)[1]  / ρ_halo(x, p)
+    res = QuadGK.quadgk(lnxp -> ρ_halo(exp(lnxp), p) * μ_halo(exp(lnxp), p) / exp(lnxp), log(x), log(xt), rtol=T(1e-5))[1]  / ρ_halo(x, p)
 
     (res < 0) && throw(DomainError("The square of the velocity dispersion cannot be negative (for x = " * string(x) * ", xt = " * string(xt) * ")"))
     
@@ -138,59 +138,61 @@ end
 # Otherwise unit conversion slightly slow down the code
 
 ## Definition of relationships between concentration, mass, scale density and scale radius
-function cΔ_from_ρs(ρs::Real, hp::HaloProfile{<:Real}, Δ::Real, ρ_ref::Real)
-    g(c::Real) = c^3 / μ_halo(c, hp) - 3 * ρs / Δ / ρ_ref
-    return Roots.find_zero(g, (1e-10, 1e+10), Roots.Bisection()) 
+function cΔ_from_ρs(ρs::T, hp::HaloProfile, Δ::T, ρ_ref::T) where {T<:AbstractFloat}
+    return exp10(Roots.find_zero(log10_c -> exp10(log10_c)^3 / μ_halo(exp10(log10_c), hp) - 3 * ρs / Δ / ρ_ref , (T(-10), T(+10)), Roots.Bisection()))
 end
 
-cΔ_from_ρs(ρs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real=200, cosmo::Cosmology = plnack18) = cΔ_from_ρs(ρs, hp, Δ, cosmo.bkg.ρ_c0)
+cΔ_from_ρs(ρs::T, hp::HaloProfile = nfwProfile, Δ::T=T(200), cosmo::Cosmology{T} = dflt_cosmo(T)) where {T<:AbstractFloat} = cΔ_from_ρs(ρs, hp, Δ, cosmo.bkg.ρ_c0)
 
-mΔ_from_ρs_and_rs(ρs::Real, rs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = 4 * pi * ρs * rs^3 * μ_halo(cΔ_from_ρs(ρs, hp, Δ, ρ_ref), hp)
-ρs_from_cΔ(cΔ::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = Δ * ρ_ref  / 3 * cΔ^3 / μ_halo(cΔ, hp) 
-rs_from_cΔ_and_mΔ(cΔ::Real, mΔ::Real, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) =  (3 * mΔ / (4 * π * Δ * ρ_ref))^(1 // 3) / cΔ 
-rΔ_from_ρs_and_rs(ρs::Real, rs::Real, hp::HaloProfile{<:Real} = nfwProfile, Δ::Real = 200, ρ_ref::Real = planck18_bkg.ρ_c0) = (3 * mΔ_from_ρs_and_rs(ρs, rs, hp, Δ, ρ_ref) / (4*π*Δ*ρ_ref))^(1//3)
+mΔ_from_ρs_and_rs(ρs::T, rs::T, hp::HaloProfile = nfwProfile, Δ::T = T(200), ρ_ref::T = dflt_bkg_cosmo(T).ρ_c0) where {T<:AbstractFloat} = T(4 * π) * ρs * rs^3 * μ_halo(cΔ_from_ρs(ρs, hp, Δ, ρ_ref), hp)
+ρs_from_cΔ(cΔ::T, hp::HaloProfile = nfwProfile, Δ::T = T(200), ρ_ref::T = dflt_bkg_cosmo(T).ρ_c0) where {T<:AbstractFloat} = Δ * ρ_ref  / 3 * cΔ^3 / μ_halo(cΔ, hp) 
+rs_from_cΔ_and_mΔ(cΔ::T, mΔ::T, Δ::T = T(200), ρ_ref::T = planck18_bkg.ρ_c0) where {T<:AbstractFloat} =  (3 * mΔ / ( T(4 * π) * Δ * ρ_ref))^(1 // 3) / cΔ 
+rΔ_from_ρs_and_rs(ρs::T, rs::T, hp::HaloProfile = nfwProfile, Δ::T = T(200), ρ_ref::T = dflt_bkg_cosmo(T).ρ_c0) where {T<:AbstractFloat} = (3 * mΔ_from_ρs_and_rs(ρs, rs, hp, Δ, ρ_ref) / (T(4*π)*Δ*ρ_ref))^(1//3)
 
-struct Halo{T<:AbstractFloat, S<:Real}
-    hp::HaloProfile{S}
+struct Halo{T<:AbstractFloat, P<:HaloProfile{<:Real}}
+    hp::P
     ρs::T
     rs::T
 end
+
+const HaloType{T} = Halo{T, <:HaloProfile{<:Real}}
 
 Base.length(::Halo) = 1
 Base.iterate(iter::Halo) = (iter, nothing)
 Base.iterate(::Halo, state::Nothing) = nothing
 
-Base.show(io::IO, h::Halo{<:AbstractFloat, <:Real}) = print(io, "Halo: \n  - " * string(h.hp) * "\n  - ρs = " * string(h.ρs) * " Msun/Mpc^3, rs = " * string(h.rs) * " Mpc \n  - m200 (planck18) = " * string(mΔ(h, 200, planck18)) * " Msun, c200 (planck18) = " * string(cΔ(h, 200, planck18)))
+Base.show(io::IO, h::Halo) = print(io, "Halo: \n  - " * string(h.hp) * "\n  - ρs = " * string(h.ρs) * " Msun/Mpc^3, rs = " * string(h.rs) * " Mpc \n  - m200 (planck18) = " * string(mΔ(h)) * " Msun, c200 (planck18) = " * string(cΔ(h)))
 
-Halo(hp::HaloProfile{S}, ρs::Real, rs::Real) where {S<:Real} = Halo(hp, promote(ρs, rs)...)
+Halo(hp::HaloProfile{S}, ρs::AbstractFloat, rs::AbstractFloat) where {S<:Real} = Halo(hp, promote(ρs, rs)...)
+convert_Halo(::Type{T}, h::Halo) where {T<:AbstractFloat} = Halo(h.hp, convert.(T, (h.ρs, h.rs))...)
 
-function halo_from_mΔ_and_cΔ(hp::HaloProfile{S}, mΔ::T, cΔ::T;  Δ::T = T(200), ρ_ref::T = planck18_bkg.ρ_c0) where {T<:AbstractFloat, S<:Real}
-    return Halo{T, S}(hp, convert(T, ρs_from_cΔ(cΔ, hp, Δ, ρ_ref)), convert(T, rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref)))
+function halo_from_mΔ_and_cΔ(hp::P, mΔ::T, cΔ::T;  Δ::T = T(200), ρ_ref::T = dflt_bkg_cosmo(T).ρ_c0) where {T<:AbstractFloat, P<:HaloProfile{<:Real}}
+    return Halo{T, P}(hp, ρs_from_cΔ(cΔ, hp, Δ, ρ_ref), rs_from_cΔ_and_mΔ(cΔ, mΔ, Δ, ρ_ref))
 end
 
-ρ_halo(r::Real, h::Halo{<:AbstractFloat, <:Real}) = h.ρs * ρ_halo(r/h.rs, h.hp)
-m_halo(r::Real, h::Halo{<:AbstractFloat, <:Real}) = 4.0 * π * h.ρs * h.rs^3 * μ_halo(r/h.rs, h.hp)
-mΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = mΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
-mΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = mΔ(h, Δ, cosmo.bkg.ρ_c0)
-cΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = cΔ_from_ρs(h.ρs, h.hp, Δ, ρ_ref)
-cΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = cΔ(h, Δ, cosmo.bkg.ρ_c0)
-rΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real, ρ_ref::Real) = rΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
-rΔ(h::Halo{<:AbstractFloat, <:Real}, Δ::Real = 200, cosmo::Cosmology = planck18) = rΔ(h, Δ, cosmo.bkg.ρ_c0)
+ρ_halo(r::T, h::HaloType{T}) where {T<:AbstractFloat} = h.ρs * ρ_halo(r/h.rs, h.hp)
+m_halo(r::T, h::HaloType{T}) where {T<:AbstractFloat} = T(4.0 * π) * h.ρs * h.rs^3 * μ_halo(r/h.rs, h.hp)
 
-ρs(h::Halo) = h.ρs * ρ_0
-rs(h::Halo) = h.rs * r_0
+cΔ(h::HaloType{T}, Δ::T, ρ_ref::T) where {T<:AbstractFloat} = cΔ_from_ρs(h.ρs, h.hp, Δ, ρ_ref)
+rΔ(h::HaloType{T}, Δ::T, ρ_ref::T) where {T<:AbstractFloat} = rΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
+mΔ(h::HaloType{T}, Δ::T, ρ_ref::T) where {T<:AbstractFloat} = mΔ_from_ρs_and_rs(h.ρs, h.rs, h.hp, Δ, ρ_ref)
+
+cΔ(h::HaloType{T}, Δ::T = T(200), cosmo::Cosmology{T} = dflt_cosmo(T)) where {T<:AbstractFloat} = cΔ(h, Δ, cosmo.bkg.ρ_c0)
+rΔ(h::HaloType{T}, Δ::T = T(200), cosmo::Cosmology{T} = dflt_cosmo(T)) where {T<:AbstractFloat} = rΔ(h, Δ, cosmo.bkg.ρ_c0)
+mΔ(h::HaloType{T}, Δ::T = T(200), cosmo::Cosmology{T} = dflt_cosmo(T)) where {T<:AbstractFloat} = mΔ(h, Δ, cosmo.bkg.ρ_c0)
+
 
 ################################################
 # Velocity of the particles inside the halo
 
 """ 1D Jeans velocity dispersion in (Mpc / s) """
-velocity_dispersion(r::Real, rt::Real, h::Halo) = sqrt(4 * π * h.ρs * h.rs^2 * G_NEWTON) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
+velocity_dispersion(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = T(sqrt(4 * π * h.ρs * h.rs^2 * G_NEWTON)) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
 
 """ 1D Jeans velocity dispersion in (km / s) """
-velocity_dispersion_kms(r::Real, rt::Real, h::Halo) = velocity_dispersion(r, rt, h) * MPC_TO_KM
+velocity_dispersion_kms(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = velocity_dispersion(r, rt, h) * T(MPC_TO_KM)
 
 """ gravitational potential in (Mpc / s)^2 """
-gravitational_potential(r::Real, rt::Real, h::Halo) = - 4 * π * h.ρs * h.rs^2 * G_NEWTON * ψ_halo(r/h.rs, rt/h.rs, h.hp) 
+gravitational_potential(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = - T(4 * π) * h.ρs * h.rs^2 * G_NEWTON * ψ_halo(r/h.rs, rt/h.rs, h.hp)
 
 """ gravitational potential in (km / s)^2 """
 gravitational_potential_kms(r::Real, rt::Real, h::Halo) = ψ_halo(r, rt, h) * (MPC_TO_KM^2)
@@ -269,67 +271,3 @@ median_concentration(m200::Real, ::Type{T} = SCP12; z::Real = 0, cosmo::Cosmolog
 halo_from_mΔ(hp::HaloProfile, mΔ::Real, ::Type{T} = SCP12;  Δ::Real = 200, cosmo::Cosmology=planck18, z=0) where {T <: MassConcentrationModel} = halo_from_mΔ_and_cΔ(hp, mΔ, median_concentration(mΔ, T, z = z, cosmo = cosmo), Δ = Δ, ρ_ref = cosmo.bkg.ρ_c0) 
 
 #######################################
-
-
-
-
-function _vd2_nfw(x::Real, xt::Real) 
-    (x >= xt) && return 0.0 
-    p =(5*x)/3 + (37*x^2)/24 + (11*x^3)/60 - (13*x^4)/240 + (37*x^5)/
-  1400 - (17*x^6)/1050 + (991*x^7)/88200 - (1187*x^8)/
-  141120 + (15409*x^9)/2328480 - (17929*x^10)/3326400 + (267727*x^11)/
-  59459400 - (304027*x^12)/79279200 + 
-   (341779*x^13)/103062960 - (190409*x^14)/65585520 + (14314177*x^15)/
-  5574769200 - (15715577*x^16)/6861254400 + (108607721*x^17)/
-  52766313600 - (39288323*x^18)/21106525440 + (8485835*x^19)/
-  5012799792 - (3041361*x^20)/1965803840 + 
-   (-(5/3) + (17*x^2)/12 + (11*x^3)/30 - (13*x^4)/120 + (37*x^5)/
-     700 - (17*x^6)/525 + (991*x^7)/44100 - (1187*x^8)/
-     70560 + (15409*x^9)/1164240 - (17929*x^10)/
-     1663200 + (267727*x^11)/29729700 - (304027*x^12)/39639600 + 
-        (341779*x^13)/51531480 - (190409*x^14)/
-     32792760 + (14314177*x^15)/2787384600 - (15715577*x^16)/
-     3430627200 + (108607721*x^17)/26383156800 - (39288323*x^18)/
-     10553262720 + (8485835*x^19)/2506399896 - (3041361*x^20)/
-     982901920)*xt + 
-   (-(37/24) - (17*x)/12 + (11*x^3)/60 - (13*x^4)/240 + (37*x^5)/
-     1400 - (17*x^6)/1050 + (991*x^7)/88200 - (1187*x^8)/
-     141120 + (15409*x^9)/2328480 - (17929*x^10)/
-     3326400 + (267727*x^11)/59459400 - (304027*x^12)/79279200 + 
-        (341779*x^13)/103062960 - (190409*x^14)/
-     65585520 + (14314177*x^15)/5574769200 - (15715577*x^16)/
-     6861254400 + (108607721*x^17)/52766313600 - (39288323*x^18)/
-     21106525440 + (8485835*x^19)/5012799792 - (3041361*x^20)/
-     1965803840)*xt^2 + 
-   (-(11/60) - (11*x)/30 - (11*x^2)/60)*
-  xt^3 + (13/240 + (13*x)/120 + (13*x^2)/240)*
-  xt^4 + (-(37/1400) - (37*x)/700 - (37*x^2)/1400)*
-  xt^5 + (17/1050 + (17*x)/525 + (17*x^2)/1050)*xt^6 + 
-   (-(991/88200) - (991*x)/44100 - (991*x^2)/88200)*
-  xt^7 + (1187/141120 + (1187*x)/70560 + (1187*x^2)/141120)*
-  xt^8 + (-(15409/2328480) - (15409*x)/1164240 - (15409*x^2)/2328480)*
-  xt^9 + 
-   (17929/3326400 + (17929*x)/1663200 + (17929*x^2)/3326400)*
-  xt^10 + (-(267727/59459400) - (267727*x)/29729700 - (267727*x^2)/
-     59459400)*
-  xt^11 + (304027/79279200 + (304027*x)/39639600 + (304027*x^2)/
-     79279200)*xt^12 + 
-   (-(341779/103062960) - (341779*x)/51531480 - (341779*x^2)/
-     103062960)*
-  xt^13 + (190409/65585520 + (190409*x)/32792760 + (190409*x^2)/
-     65585520)*
-  xt^14 + (-(14314177/5574769200) - (14314177*x)/
-     2787384600 - (14314177*x^2)/5574769200)*xt^15 + 
-   (15715577/6861254400 + (15715577*x)/3430627200 + (15715577*x^2)/
-     6861254400)*
-  xt^16 + (-(108607721/52766313600) - (108607721*x)/
-     26383156800 - (108607721*x^2)/52766313600)*xt^17 + 
-   (39288323/21106525440 + (39288323*x)/10553262720 + (39288323*x^2)/
-     21106525440)*
-  xt^18 + (-(8485835/5012799792) - (8485835*x)/
-     2506399896 - (8485835*x^2)/5012799792)*xt^19 + 
-   (3041361/1965803840 + (3041361*x)/982901920 + (3041361*x^2)/
-     1965803840)*xt^20
-    q = 1/2 + x + xt + 2 * x * xt + 1/2*x^2 + x^2 * xt + 1/2 * xt^2 + x * xt^2 + 1/2*x^2*xt^2
-    return x/(1+xt)^2 * ( p + log(xt/x) * q)
-end 
