@@ -21,9 +21,9 @@ export Halo, nfwProfile, αβγProfile, HaloProfile, coreProfile, plummerProfile
 export halo_from_mΔ_and_cΔ, halo_from_mΔ
 export mΔ_from_ρs_and_rs, mΔ, rΔ_from_ρs_and_rs, rΔ, cΔ_from_ρs, cΔ, ρ_halo, μ_halo, m_halo
 export rs_from_cΔ_and_mΔ, ρs_from_cΔ
-export velocity_dispersion, velocity_dispersion_kms, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
-export gravitational_potential_kms
-export get_halo_profile_type, GenericHalo
+export velocity_dispersion, gravitational_potential, escape_velocity, orbital_frequency, circular_velocity
+export velocity_dispersion_kms, gravitational_potential_kms, escape_velocity_kms, orbital_frequency_s, circular_velocity_kms
+export get_halo_profile_type, HaloType
 
 abstract type HaloProfile{T<:Real} end
 
@@ -185,33 +185,35 @@ mΔ(h::HaloType{T}, Δ::T = T(200), cosmo::Cosmology{T} = dflt_cosmo(T)) where {
 ################################################
 # Velocity of the particles inside the halo
 
-""" 1D Jeans velocity dispersion in (Mpc / s) """
-velocity_dispersion(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = T(sqrt(4 * π * h.ρs * h.rs^2 * G_NEWTON)) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
+""" 1D Jeans velocity dispersion in (Mpc / Gyrs) """
+velocity_dispersion(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = sqrt(T(4) * π * h.ρs * h.rs^2 * constant_G_NEWTON(MegaParsecs, Msun, GigaYears, T)) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
 
 """ 1D Jeans velocity dispersion in (km / s) """
-velocity_dispersion_kms(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = velocity_dispersion(r, rt, h) * T(MPC_TO_KM)
+velocity_dispersion_kms(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = sqrt(T(4) * π * h.ρs * h.rs^2 / convert_lengths(MegaParsecs, KiloMeters, T) * constant_G_NEWTON(KiloMeters, Msun, Seconds, T)) * velocity_dispersion(r/h.rs, rt/h.rs, h.hp) 
 
-""" gravitational potential in (Mpc / s)^2 """
-gravitational_potential(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = - T(4 * π) * h.ρs * h.rs^2 * G_NEWTON * ψ_halo(r/h.rs, rt/h.rs, h.hp)
+""" gravitational potential in (Mpc / Gyrs)^2 """
+gravitational_potential(r::T, rt::T, h::HaloType{T}) where {T<:AbstractFloat} = - T(4 * π) * h.ρs * h.rs^2 * constant_G_NEWTON(MegaParsecs, Msun, GigaYears, T) * ψ_halo(r/h.rs, rt/h.rs, h.hp)
 
 """ gravitational potential in (km / s)^2 """
-gravitational_potential_kms(r::Real, rt::Real, h::Halo) = ψ_halo(r, rt, h) * (MPC_TO_KM^2)
+gravitational_potential_kms(r::T, rt::T, h::HaloType{T})  where {T<:AbstractFloat} =  - T(4 * π) * h.ρs * h.rs^2 / convert_lengths(MegaParsecs, KiloMeters, T) * constant_G_NEWTON(KiloMeters, Msun, Seconds, T) * ψ_halo(r/h.rs, rt/h.rs, h.hp)
 
-""" escape velocity in (Mpc / s) """
-escape_velocity(r::Real, rt::Real, h::Halo) = sqrt(2*abs(ψ_halo(r, rt, h)))
+""" escape velocity in (Mpc / Gyrs) """
+escape_velocity(r::Real, rt::Real, h::Halo) = sqrt(2*abs(gravitational_potential(r, rt, h)))
 
 """ escape velocity in (km / s) """
-escape_velocity_kms(r::Real, rt::Real, h::Halo) = sqrt(2*abs(ψ_halo_kms(r, rt, h))) * MPC_TO_KM
+escape_velocity_kms(r::Real, rt::Real, h::Halo) = sqrt(2*abs(gravitational_potential_kms(r, rt, h)))
 
-""" circular velocity in (Mpc / s)"""
-circular_velocity(r::Real, h::Halo) = sqrt(G_NEWTON * m_halo(r, h) / r)
+""" circular velocity in (Mpc / Gyrs)"""
+circular_velocity(r::Real, h::Halo) = sqrt(constant_G_NEWTON(KiloMeters, Msun, Seconds, T) * m_halo(r, h) / r)
 
 """ circular velocity in (km / s)"""
-circular_velocity_kms(r::Real, h::Halo) = sqrt(G_NEWTON * m_halo(r, h) / r) * MPC_TO_KM
+circular_velocity_kms(r::Real, h::Halo) = sqrt(constant_G_NEWTON(KiloMeters, Msun, GigaYears, T) * m_halo(r, h) / convert_lengths(r, MegaParsecs, KiloMeters))
 
-""" orbital frequency in (1 / s) """
+""" orbital frequency in (1 / Gyrs) """
 orbital_frequency(r::Real, h::Halo) = circular_velocity(r, h) / (2*π*r)
 
+""" orbital frequency in (1 / s) """
+orbital_frequency_s(r::Real, h::Halo) = circular_velocity_kms(r, h) / (2*π*convert_lengths(r, MegaParsecs, KiloMeters))
 
 
 #######################################
@@ -225,24 +227,24 @@ abstract type SCP12 <: MassConcentrationModel end
 abstract type MDvdB08 <: MassConcentrationModel end
 abstract type PKCBRP12 <: MassConcentrationModel end
 
-function median_concentration(m200::Real, z::Real, cosmo::Cosmology, ::Type{SCP12})
+function median_concentration(m200::T, z::T, cosmo::Cosmology{T}, ::Type{SCP12}) where {T<:AbstractFloat}
 
-    (z != 0) && Throw(ArgumentError("The mass-concentration model SCP12 is not defined for z > 0"))
+    (z != T(0)) && Throw(ArgumentError("The mass-concentration model SCP12 is not defined for z > 0"))
 
-    cn::Vector = [37.5153, -1.5093, 1.636e-2, 3.66e-4, -2.89237e-5, 5.32e-7]
-    m200_min = (m200 > 7.24e-10) ? m200 : 7.24e-10
+    cn::Vector = T.([37.5153, -1.5093, 1.636e-2, 3.66e-4, -2.89237e-5, 5.32e-7])
+    m200_min = (m200 > T(7.24e-10)) ? m200 : T(7.24e-10)
 
     return sum(cn .* log(m200_min * cosmo.bkg.h).^(0:5))
 end
 
 
-function median_concentration(m200::Real, z::Real, cosmo::Cosmology, ::Type{MDvdB08})
+function median_concentration(m200::T, z::T, cosmo::Cosmology{T}, ::Type{MDvdB08}) where {T<:AbstractFloat}
     
     # parameters of the model
-    K200 = 3.6
-    F = 0.01
+    K200 = T(3.6)
+    F = T(0.01)
 
-    zc = 10^Roots.find_zero(logz -> σ_mps_M(F * m200, TopHatWindow, cosmology = cosmo) * growth_factor_Carroll(10^(logz), cosmo.bkg) / growth_factor_Carroll(0.0, cosmo.bkg) - 1.686, (-6, 10), Roots.Bisection())
+    zc = exp10(Roots.find_zero(log10z -> σ_mps_M(F * m200, TopHatWindow, cosmology = cosmo) * growth_factor_Carroll(exp10(log10z), cosmo.bkg) / growth_factor_Carroll(T(0), cosmo.bkg) - T(1.686), (-6, 10), Roots.Bisection()))
     return K200 * (ρ_critical(zc, cosmo.bkg)/ ρ_critical(z, cosmo.bkg))^(1/3)
 end
 
@@ -266,7 +268,7 @@ function median_concentration(m200::Real, z::Real, cosmo::Cosmology, ::Type{PKCB
 end
 
 
-median_concentration(m200::Real, ::Type{T} = SCP12; z::Real = 0, cosmo::Cosmology=planck18) where {T <: MassConcentrationModel} = median_concentration(m200, z, cosmo, T)
+median_concentration(m200::T, ::Type{MCM} = SCP12; z::T = T(0), cosmo::Cosmology{T} = dflt_cosmo(T)) where {T<:AbstractFloat, MCM <: MassConcentrationModel} = median_concentration(m200, z, cosmo, MCM)
 
 halo_from_mΔ(hp::HaloProfile, mΔ::Real, ::Type{T} = SCP12;  Δ::Real = 200, cosmo::Cosmology=planck18, z=0) where {T <: MassConcentrationModel} = halo_from_mΔ_and_cΔ(hp, mΔ, median_concentration(mΔ, T, z = z, cosmo = cosmo), Δ = Δ, ρ_ref = cosmo.bkg.ρ_c0) 
 

@@ -29,7 +29,7 @@ export hubble_H0, hubble_H0_s, hubble_E, hubble_E2, hubble_H
 export Ω, Ω_vs_a, Ω_m, Ω_r, Ω_Λ, mean_ρ, ρ_critical
 export z_eq_mr, z_eq_Λm, z_to_a, a_to_z, temperature_CMB_K, k_eq_mr
 export growth_factor, growth_factor_Carroll
-export lookback_time, lookback_redshift, universe_age
+export lookback_time, lookback_redshift, universe_age, δt, δt_s
 export dflt_bkg_cosmo
 
 @doc raw"""
@@ -196,6 +196,17 @@ Hubble constant H₀ (in 1/s) for the cosmology.
 """
 hubble_H0_s(bkg_cosmo::FLRW{T}) where {T<:AbstractFloat} = convert_lengths(hubble_H0(bkg_cosmo), KiloMeters, MegaParsecs)
 hubble_H0_s(::Type{T} = Float64) where {T<:AbstractFloat} = hubble_H0_s(dflt_bkg_cosmo(T))
+
+@doc raw"""
+    hubble_H0_Gyrs(bkg_cosmo)
+
+Hubble constant H₀ (in 1/s) for the cosmology.
+
+# Arguments
+- `bkg_cosmo::BkgCosmology`: Cosmological background model (default: `planck18_bkg`)
+"""
+hubble_H0_Gyrs(bkg_cosmo::FLRW{T}) where {T<:AbstractFloat} = convert_lengths(hubble_H0(bkg_cosmo), KiloMeters, MegaParsecs) / convert_times(Seconds, GigaYears, T)
+hubble_H0_Gyrs(::Type{T} = Float64) where {T<:AbstractFloat} = hubble_H0_Gyrs(dflt_bkg_cosmo(T))
 
 @doc raw"""
     hubble_E2(z, bkg_cosmo)
@@ -391,13 +402,15 @@ z_eq_Λm(::Type{T} = Float64) where {T<:AbstractFloat} = z_eq_Λm(dflt_bkg_cosmo
 a_eq_mr(::Type{T} = Float64) where {T<:AbstractFloat} = a_eq_mr(dflt_bkg_cosmo(T))
 a_eq_Λm(::Type{T} = Float64) where {T<:AbstractFloat} = a_eq_Λm(dflt_bkg_cosmo(T))
 
+δt(a0::T, a1::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = QuadGK.quadgk(a -> 1 / hubble_E(a_to_z(a), bkg_cosmo) / a, a0, a1, rtol=T(1e-3); kws...)[1] / (hubble_H0_Gyrs(bkg_cosmo))
 δt_s(a0::T, a1::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = QuadGK.quadgk(a -> 1 / hubble_E(a_to_z(a), bkg_cosmo) / a, a0, a1, rtol=T(1e-3); kws...)[1] / (hubble_H0_s(bkg_cosmo))
+
 
 @doc raw""" 
 
     universe_age(z, bkg_cosmo; kws...)
     
-age of the universe (s)
+age of the universe (Gyrs)
 
 # Arguments
 - `z::Float64` : redshift (dimensionless), default 0.0
@@ -406,14 +419,14 @@ age of the universe (s)
 # Kwargs
 - Any argument that can be passed to `QuadGK.quadgk'
 """
-universe_age(z::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = δt_s(T(0), z_to_a(z), bkg_cosmo; kws...)
+universe_age(z::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = δt(T(0), z_to_a(z), bkg_cosmo; kws...)
 universe_age(::Type{T} = Float64; kws...) where {T<:AbstractFloat} = universe_age(T(0); kws...)
 
 @doc raw""" 
 
     lookback_time(z, bkg_cosmo; kws...)
     
-lookback time of the Universe (s)
+lookback time of the Universe (Gyrs)
 
 # Arguments
 - `z::Real` : redshift (dimensionless)
@@ -422,16 +435,16 @@ lookback time of the Universe (s)
 # Kwargs
 - Any argument that can be passed to `QuadGK.quadgk'
 """
-lookback_time(z::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = δt_s(z_to_a(z), T(1), bkg_cosmo; kws...)
+lookback_time(z::T, bkg_cosmo::FLRW{T} = dflt_bkg_cosmo(T); kws...) where {T<:AbstractFloat} = δt(z_to_a(z), T(1), bkg_cosmo; kws...)
 
 @doc raw""" 
 
     lookback_lookback_redshift(t, bkg_cosmo; kws...)
     
-lookback redshift of the Universe for t in (s)
+lookback redshift of the Universe for t in (Gyrs)
 
 # Arguments
-- `t::Real` : time (s)
+- `t::Real` : time (Gyrs)
 - `bkg_cosmo::BkgCosmology` : background cosmology (dimensionless), default planck18_bkg
 
 # Kwargs
